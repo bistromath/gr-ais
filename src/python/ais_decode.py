@@ -18,6 +18,7 @@ from usrpm import usrp_dbid
 
 #from pkt import *
 import time
+import sys
 import gnuradio.gr.gr_threading as _threading
 
 class top_block_runner(_threading.Thread):
@@ -92,24 +93,26 @@ class my_top_block(gr.top_block):
 		self.rate = options.rate
 		#print "Samples per second is %i" % self.rate
 		self.u = src
-		self.coeffs = gr.firdes.low_pass(1,self.rate,10000,1000)
+		self.coeffs = gr.firdes.low_pass(1,self.rate,12000,1000) #4/29/10: added 2k to skirts to allow wider frequency estimation leeway
 		self._filter_decimation = 4
 		self.filter = gr.freq_xlating_fir_filter_ccf(self._filter_decimation, 
 													 self.coeffs, 
 													 freq,
 													 self.rate)
 
-		self._syms_per_sec = 9600.0;
+		self.agc = gr.agc_cc(1e-4, 1.0, 1.0, 0.0) #doesn't seem to do much for me
 
-		self._samples_per_symbol = self.rate / self._filter_decimation / self._syms_per_sec
-		#print "Samples per symbol is %f" % (self._samples_per_symbol,)
+		self._bits_per_sec = 9600.0;
+
+		self._samples_per_symbol = self.rate / self._filter_decimation / self._bits_per_sec
 
 		options.samples_per_symbol = self._samples_per_symbol
-		options.gain_mu = 0.5
+		options.gain_mu = 0.7
 		options.mu=0.5
 		options.omega_relative_limit = 0.0001
-		options.syms_per_sec = self._syms_per_sec
-
+		options.bits_per_sec = self._bits_per_sec
+		options.fftlen = 4096 #trades off accuracy of freq estimation in presence of noise, vs. delay time.
+		options.samp_rate = self.rate / self._filter_decimation
 		self.demod = ais_demod(options) #ais_demod.py, hierarchical demodulation block, takes in complex baseband and spits out 1-bit packed bitstream
 		self.start_correlator = gr.correlate_access_code_bb("1010101010101010", 0) #should mark start of packet
 		self.stop_correlator = gr.correlate_access_code_bb("01111110", 0) #should mark start and end of packet
@@ -117,10 +120,9 @@ class my_top_block(gr.top_block):
 		self.unstuff = ais.unstuff() #ais_unstuff.cc, unstuffs data
 		self.parse = ais.parse(queue, designator) #ais_parse.cc, calculates CRC, parses data into ASCII message, moves data onto queue
 
-		self.connect(self.u, self.filter, self.demod, self.start_correlator, (self.shift, 0))#now, ais.shift takes the output of the first correlator and moves the flag to the second bit
+		self.connect(self.u, self.filter, self.agc, self.demod, self.start_correlator, (self.shift, 0))#ais.shift takes the output of the first correlator and moves the flag to the second bit
 		self.connect(self.demod, self.stop_correlator, (self.shift, 1)) #so we can encode another correlator flag bit into the stream
 		self.connect(self.shift, self.unstuff, self.parse) #parse posts messages to the queue, which the main loop reads and prints
-
 
 
 def main():
@@ -141,10 +143,12 @@ def main():
 						help="set offset error of USRP [default=%default]")
 	parser.add_option("-g", "--gain", type="int", default=None,
 						help="set RF gain", metavar="dB")
-	parser.add_option("-d", "--decim", type="int", default=256,
+	parser.add_option("-d", "--decim", type="int", default=250,
 						help="set fgpa decimation rate to DECIM [default=%default]")
 	parser.add_option("-F", "--filename", type="string", default=None,
 						help="read data from file instead of USRP")
+	parser.add_option("-v", "--viterbi", action="store_true", default=False,
+						help="Use optional coherent demodulation and Viterbi decoder")
 
 	#receive_path.add_options(parser, expert_grp)
 
@@ -166,6 +170,8 @@ def main():
 				sentence = msg.to_string()
 				#s = make_printable(sentence)
 				print sentence
+				sys.stdout.flush()
+
 #		tb.adjust_freq()
 			elif runner.done:
 				break

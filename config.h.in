@@ -93,6 +93,10 @@
 /* Define to 1 if you have the <winioctl.h> header file. */
 #undef HAVE_WINIOCTL_H
 
+/* Define to the sub-directory in which libtool stores uninstalled libraries.
+   */
+#undef LT_OBJDIR
+
 /* Define if mkdir accepts only one arg */
 #undef MKDIR_TAKES_ONE_ARG
 

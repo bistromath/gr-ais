@@ -75,9 +75,9 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
-DIST_COMMON = $(noinst_PYTHON) $(srcdir)/Makefile.am \
-	$(srcdir)/Makefile.in $(srcdir)/run_tests.in \
-	$(top_srcdir)/Makefile.common
+DIST_COMMON = $(noinst_PYTHON) $(ourpython_PYTHON) \
+	$(srcdir)/Makefile.am $(srcdir)/Makefile.in \
+	$(srcdir)/run_tests.in $(top_srcdir)/Makefile.common
 subdir = src/python
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/config/gr_gprof.m4 \
@@ -89,6 +89,11 @@ am__aclocal_m4_deps = $(top_srcdir)/config/gr_gprof.m4 \
 	$(top_srcdir)/config/gr_swig.m4 $(top_srcdir)/config/lf_cc.m4 \
 	$(top_srcdir)/config/lf_cxx.m4 \
 	$(top_srcdir)/config/lf_warnings.m4 \
+	$(top_srcdir)/config/libtool.m4 \
+	$(top_srcdir)/config/ltoptions.m4 \
+	$(top_srcdir)/config/ltsugar.m4 \
+	$(top_srcdir)/config/ltversion.m4 \
+	$(top_srcdir)/config/lt~obsolete.m4 \
 	$(top_srcdir)/config/pkg.m4 \
 	$(top_srcdir)/config/gr_standalone.m4 \
 	$(top_srcdir)/configure.ac
@@ -99,6 +104,14 @@ CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES = run_tests
 SOURCES =
 DIST_SOURCES =
+am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
+am__vpath_adj = case $$p in \
+    $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
+    *) f=$$p;; \
+  esac;
+am__strip_dir = `echo $$p | sed -e 's|^.*/||'`;
+am__installdirs = "$(DESTDIR)$(ourpythondir)"
+ourpythonPYTHON_INSTALL = $(INSTALL_DATA)
 py_compile = $(top_srcdir)/py-compile
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
@@ -126,14 +139,13 @@ DEFS = @DEFS@
 DEPDIR = @DEPDIR@
 DLLTOOL = @DLLTOOL@
 DSYMUTIL = @DSYMUTIL@
-ECHO = @ECHO@
+DUMPBIN = @DUMPBIN@
 ECHO_C = @ECHO_C@
 ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
-F77 = @F77@
-FFLAGS = @FFLAGS@
+FGREP = @FGREP@
 GNURADIO_CORE_CFLAGS = @GNURADIO_CORE_CFLAGS@
 GNURADIO_CORE_CPPFLAGS = @GNURADIO_CORE_CPPFLAGS@
 GNURADIO_CORE_INCLUDEDIR = @GNURADIO_CORE_INCLUDEDIR@
@@ -144,18 +156,23 @@ INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
+LD = @LD@
 LDFLAGS = @LDFLAGS@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
+LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
 MAKEINFO = @MAKEINFO@
 MKDIR_P = @MKDIR_P@
+NM = @NM@
 NMEDIT = @NMEDIT@
 NO_UNDEFINED = @NO_UNDEFINED@
 OBJDUMP = @OBJDUMP@
 OBJEXT = @OBJEXT@
+OTOOL = @OTOOL@
+OTOOL64 = @OTOOL64@
 PACKAGE = @PACKAGE@
 PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
 PACKAGE_NAME = @PACKAGE_NAME@
@@ -189,7 +206,7 @@ abs_top_builddir = @abs_top_builddir@
 abs_top_srcdir = @abs_top_srcdir@
 ac_ct_CC = @ac_ct_CC@
 ac_ct_CXX = @ac_ct_CXX@
-ac_ct_F77 = @ac_ct_F77@
+ac_ct_DUMPBIN = @ac_ct_DUMPBIN@
 am__include = @am__include@
 am__leading_dot = @am__leading_dot@
 am__quote = @am__quote@
@@ -222,6 +239,7 @@ libdir = @libdir@
 libexecdir = @libexecdir@
 localedir = @localedir@
 localstatedir = @localstatedir@
+lt_ECHO = @lt_ECHO@
 mandir = @mandir@
 mkdir_p = @mkdir_p@
 oldincludedir = @oldincludedir@
@@ -286,6 +304,10 @@ RM = $(RM_PROG) -f
 STAMPS = 
 MOSTLYCLEANFILES = $(BUILT_SOURCES) $(STAMPS) *.pyc *.pyo *~ *.tmp *.loT
 EXTRA_DIST = run_tests.in
+ourpythondir = $(grpythondir)
+ourpython_PYTHON = \
+  fsm_utils.py
+
 TESTS = \
 	run_tests
 
@@ -332,6 +354,34 @@ mostlyclean-libtool:
 
 clean-libtool:
 	-rm -rf .libs _libs
+install-ourpythonPYTHON: $(ourpython_PYTHON)
+	@$(NORMAL_INSTALL)
+	test -z "$(ourpythondir)" || $(MKDIR_P) "$(DESTDIR)$(ourpythondir)"
+	@list='$(ourpython_PYTHON)'; dlist=''; for p in $$list; do\
+	  if test -f "$$p"; then b=; else b="$(srcdir)/"; fi; \
+	  if test -f $$b$$p; then \
+	    f=$(am__strip_dir) \
+	    dlist="$$dlist $$f"; \
+	    echo " $(ourpythonPYTHON_INSTALL) '$$b$$p' '$(DESTDIR)$(ourpythondir)/$$f'"; \
+	    $(ourpythonPYTHON_INSTALL) "$$b$$p" "$(DESTDIR)$(ourpythondir)/$$f"; \
+	  else :; fi; \
+	done; \
+	if test -n "$$dlist"; then \
+	  if test -z "$(DESTDIR)"; then \
+	    PYTHON=$(PYTHON) $(py_compile) --basedir "$(ourpythondir)" $$dlist; \
+	  else \
+	    PYTHON=$(PYTHON) $(py_compile) --destdir "$(DESTDIR)" --basedir "$(ourpythondir)" $$dlist; \
+	  fi; \
+	else :; fi
+
+uninstall-ourpythonPYTHON:
+	@$(NORMAL_UNINSTALL)
+	@list='$(ourpython_PYTHON)'; dlist=''; for p in $$list; do\
+	  f=$(am__strip_dir) \
+	  rm -f "$(DESTDIR)$(ourpythondir)/$$f"; \
+	  rm -f "$(DESTDIR)$(ourpythondir)/$${f}c"; \
+	  rm -f "$(DESTDIR)$(ourpythondir)/$${f}o"; \
+	done
 tags: TAGS
 TAGS:
 
@@ -446,6 +496,9 @@ check-am: all-am
 check: check-am
 all-am: Makefile
 installdirs:
+	for dir in "$(DESTDIR)$(ourpythondir)"; do \
+	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
+	done
 install: install-am
 install-exec: install-exec-am
 install-data: install-data-am
@@ -489,7 +542,7 @@ info: info-am
 
 info-am:
 
-install-data-am:
+install-data-am: install-ourpythonPYTHON
 
 install-dvi: install-dvi-am
 
@@ -523,7 +576,7 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am:
+uninstall-am: uninstall-ourpythonPYTHON
 
 .MAKE: install-am install-strip
 
@@ -533,11 +586,11 @@ uninstall-am:
 	install install-am install-data install-data-am install-dvi \
 	install-dvi-am install-exec install-exec-am install-html \
 	install-html-am install-info install-info-am install-man \
-	install-pdf install-pdf-am install-ps install-ps-am \
-	install-strip installcheck installcheck-am installdirs \
-	maintainer-clean maintainer-clean-generic mostlyclean \
-	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
-	uninstall uninstall-am
+	install-ourpythonPYTHON install-pdf install-pdf-am install-ps \
+	install-ps-am install-strip installcheck installcheck-am \
+	installdirs maintainer-clean maintainer-clean-generic \
+	mostlyclean mostlyclean-generic mostlyclean-libtool pdf pdf-am \
+	ps ps-am uninstall uninstall-am uninstall-ourpythonPYTHON
 
 
 # Don't distribute the files defined in the variable 'no_dist_files'

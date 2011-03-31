@@ -138,6 +138,11 @@ am__aclocal_m4_deps = $(top_srcdir)/config/gr_gprof.m4 \
 	$(top_srcdir)/config/gr_swig.m4 $(top_srcdir)/config/lf_cc.m4 \
 	$(top_srcdir)/config/lf_cxx.m4 \
 	$(top_srcdir)/config/lf_warnings.m4 \
+	$(top_srcdir)/config/libtool.m4 \
+	$(top_srcdir)/config/ltoptions.m4 \
+	$(top_srcdir)/config/ltsugar.m4 \
+	$(top_srcdir)/config/ltversion.m4 \
+	$(top_srcdir)/config/lt~obsolete.m4 \
 	$(top_srcdir)/config/pkg.m4 \
 	$(top_srcdir)/config/gr_standalone.m4 \
 	$(top_srcdir)/configure.ac
@@ -161,7 +166,7 @@ am__DEPENDENCIES_1 =
 _ais_la_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am__objects_1 = _ais_la-ais_invert.lo _ais_la-ais_unstuff.lo \
 	_ais_la-ais_parse.lo _ais_la-ais_shift.lo \
-	_ais_la-ais_extended_lms_dfe_ff.lo
+	_ais_la-ais_extended_lms_dfe_ff.lo _ais_la-ais_freqest.lo
 am__ais_la_OBJECTS = _ais_la-ais.lo $(am__objects_1)
 _ais_la_OBJECTS = $(am__ais_la_OBJECTS)
 _ais_la_LINK = $(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
@@ -214,14 +219,13 @@ DEFS = @DEFS@
 DEPDIR = @DEPDIR@
 DLLTOOL = @DLLTOOL@
 DSYMUTIL = @DSYMUTIL@
-ECHO = @ECHO@
+DUMPBIN = @DUMPBIN@
 ECHO_C = @ECHO_C@
 ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
-F77 = @F77@
-FFLAGS = @FFLAGS@
+FGREP = @FGREP@
 GNURADIO_CORE_CFLAGS = @GNURADIO_CORE_CFLAGS@
 GNURADIO_CORE_CPPFLAGS = @GNURADIO_CORE_CPPFLAGS@
 GNURADIO_CORE_INCLUDEDIR = @GNURADIO_CORE_INCLUDEDIR@
@@ -232,18 +236,23 @@ INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
+LD = @LD@
 LDFLAGS = @LDFLAGS@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
+LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
 MAKEINFO = @MAKEINFO@
 MKDIR_P = @MKDIR_P@
+NM = @NM@
 NMEDIT = @NMEDIT@
 NO_UNDEFINED = @NO_UNDEFINED@
 OBJDUMP = @OBJDUMP@
 OBJEXT = @OBJEXT@
+OTOOL = @OTOOL@
+OTOOL64 = @OTOOL64@
 PACKAGE = @PACKAGE@
 PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
 PACKAGE_NAME = @PACKAGE_NAME@
@@ -277,7 +286,7 @@ abs_top_builddir = @abs_top_builddir@
 abs_top_srcdir = @abs_top_srcdir@
 ac_ct_CC = @ac_ct_CC@
 ac_ct_CXX = @ac_ct_CXX@
-ac_ct_F77 = @ac_ct_F77@
+ac_ct_DUMPBIN = @ac_ct_DUMPBIN@
 am__include = @am__include@
 am__leading_dot = @am__leading_dot@
 am__quote = @am__quote@
@@ -310,6 +319,7 @@ libdir = @libdir@
 libexecdir = @libexecdir@
 localedir = @localedir@
 localstatedir = @localstatedir@
+lt_ECHO = @lt_ECHO@
 mandir = @mandir@
 mkdir_p = @mkdir_p@
 oldincludedir = @oldincludedir@
@@ -381,7 +391,8 @@ grinclude_HEADERS = \
 	ais_unstuff.h	\
 	ais_parse.h 	\
 	ais_shift.h		\
-	ais_extended_lms_dfe_ff.h
+	ais_extended_lms_dfe_ff.h \
+	ais_freqest.h
 
 
 ###################################
@@ -408,7 +419,8 @@ ais_la_swig_sources = \
 	ais_unstuff.cc	\
 	ais_parse.cc	\
 	ais_shift.cc	\
-	ais_extended_lms_dfe_ff.cc
+	ais_extended_lms_dfe_ff.cc \
+	ais_freqest.cc
 
 SWIG_PYTHON_FLAGS = \
 	-fvirtual	\
@@ -564,6 +576,7 @@ distclean-compile:
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_ais_la-ais.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_ais_la-ais_extended_lms_dfe_ff.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_ais_la-ais_freqest.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_ais_la-ais_invert.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_ais_la-ais_parse.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/_ais_la-ais_shift.Plo@am__quote@
@@ -631,6 +644,13 @@ _ais_la-ais_extended_lms_dfe_ff.lo: ais_extended_lms_dfe_ff.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='ais_extended_lms_dfe_ff.cc' object='_ais_la-ais_extended_lms_dfe_ff.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(_ais_la_CXXFLAGS) $(CXXFLAGS) -c -o _ais_la-ais_extended_lms_dfe_ff.lo `test -f 'ais_extended_lms_dfe_ff.cc' || echo '$(srcdir)/'`ais_extended_lms_dfe_ff.cc
+
+_ais_la-ais_freqest.lo: ais_freqest.cc
+@am__fastdepCXX_TRUE@	$(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(_ais_la_CXXFLAGS) $(CXXFLAGS) -MT _ais_la-ais_freqest.lo -MD -MP -MF $(DEPDIR)/_ais_la-ais_freqest.Tpo -c -o _ais_la-ais_freqest.lo `test -f 'ais_freqest.cc' || echo '$(srcdir)/'`ais_freqest.cc
+@am__fastdepCXX_TRUE@	mv -f $(DEPDIR)/_ais_la-ais_freqest.Tpo $(DEPDIR)/_ais_la-ais_freqest.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='ais_freqest.cc' object='_ais_la-ais_freqest.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(_ais_la_CXXFLAGS) $(CXXFLAGS) -c -o _ais_la-ais_freqest.lo `test -f 'ais_freqest.cc' || echo '$(srcdir)/'`ais_freqest.cc
 
 mostlyclean-libtool:
 	-rm -f *.lo

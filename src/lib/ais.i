@@ -8,6 +8,7 @@
 #include "ais_parse.h"
 #include "ais_shift.h"
 #include "ais_extended_lms_dfe_ff.h"
+#include "ais_freqest.h"
 %}
 
 // ----------------------------------------------------------------
@@ -77,6 +78,18 @@ class ais_extended_lms_dfe_ff : public gr_sync_block
 private:
 	ais_extended_lms_dfe_ff(float lambda_ff, float lambda_fb , 
 			      unsigned int num_fftaps, unsigned int num_fbtaps);
+
+public:
+};
+
+GR_SWIG_BLOCK_MAGIC(ais,freqest);
+
+ais_freqest_sptr ais_make_freqest(int sample_rate, int data_rate, int fftlen);
+
+class ais_freqest : public gr_sync_block
+{
+private:
+	ais_freqest(int sample_rate, int data_rate, int fftlen);
 
 public:
 };
