@@ -1,0 +1,47 @@
+K 25
+svn:wc:ra_dav:version-url
+V 52
+/cgran/!svn/ver/366/projects/gr-ais/trunk/src/python
+END
+Makefile.in
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/cgran/!svn/ver/364/projects/gr-ais/trunk/src/python/Makefile.in
+END
+qa_ais.py
+K 25
+svn:wc:ra_dav:version-url
+V 62
+/cgran/!svn/ver/364/projects/gr-ais/trunk/src/python/qa_ais.py
+END
+ais_decode.py
+K 25
+svn:wc:ra_dav:version-url
+V 66
+/cgran/!svn/ver/366/projects/gr-ais/trunk/src/python/ais_decode.py
+END
+qa_howto.py
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/cgran/!svn/ver/364/projects/gr-ais/trunk/src/python/qa_howto.py
+END
+Makefile.am
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/cgran/!svn/ver/364/projects/gr-ais/trunk/src/python/Makefile.am
+END
+ais_demod.py
+K 25
+svn:wc:ra_dav:version-url
+V 65
+/cgran/!svn/ver/364/projects/gr-ais/trunk/src/python/ais_demod.py
+END
+run_tests.in
+K 25
+svn:wc:ra_dav:version-url
+V 65
+/cgran/!svn/ver/364/projects/gr-ais/trunk/src/python/run_tests.in
+END

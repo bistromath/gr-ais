@@ -1,0 +1,51 @@
+AIS receiver for GnuRadio
+Nick Foster <bistromath@gmail.com>
+July 2009
+
+The basics
+----------
+This module implements an AIS receiver for GnuRadio. AIS is the Automatic Identification System, a protocol designed to facilitate safety at sea by broadcasting ship data such as speed, heading, rate of turn, tonnage, draft, ship name, destination, etc. Ships of more than 65 feet in length or 150 tons in weight are required by Federal law to utilize an AIS transceiver, so in densely-populated ports you will receive quite a bit of traffic.
+
+The module outputs processed NMEA 0183 frames, designed to interface with any standard NMEA receiver. For a free Linux implementation, see ESR's gpsd program (http://gpsd.berlios.de/), specifically the program ais.py included with the gpsd distribution. The output of ais.py can be further parsed, to KML for instance, for a map implementation. If I had the first idea how to work the Google Maps API, I might try it myself. If you're into that sort of thing, please, pick up the baton, I'd really like to have a map interface. =)
+
+
+The installation
+----------------
+./bootstrap
+./configure
+make
+sudo make install
+
+
+The use
+-------
+cd src/python
+./ais_decode.py -R B -g 55 -e -2e3
+
+The -e option is the only tricky bit, and specifies an error offset specific to your USRP, since I haven't implemented carrier synchronization yet. -2e3 means my USRP *actually* tunes 161.998MHz when I tune it to 162.000MHz, and so the USRP will tune accordingly to correct the offset. The offset will vary over time and temperature. Play with this setting for best results; you'll have to be within 1-2 kHz to get the best possible decoding. Also, I added a 162MHz front-end filter to my setup because I live like a mile from Sutro Tower and without the filter the less-than-selective TVRX would probably self-immolate.
+
+You can also use a -F <filename> option to make the decoder receive recorded data. The -e and -g options are not used in this mode, but decimation can still be specified here.
+
+
+Technical details
+-----------------
+AIS is a GMSK modulated packet broadcast at 9600bps on two channels: the A channel is 161.975MHz, and the B channel is 162.025MHz. The packets contain either 168 or 440 bits of information and are prefaced with a preamble and suffixed with a checksum. Packets are bit-stuffed to ensure timely bit transitions for clock recovery, and NRZI-encoded.
+
+The receiver uses a quadrature demodulator followed by a low-pass filter to demodulate the signal. The demodulated signal is passed to a M&M clock recovery module. From there, a modified decision-feedback estimator attempts to correct ISI caused by GMSK modulation and channel distortion. The DFE is based on the gr.lms_dfe block included in GR, but with a reset input designed to accept a correlator output which is keyed to the training sequence. The DFE then resets its taps and runs through the first 150 bits of the packet 12 times, training the DFE for the channel. It then runs through the packet with the trained taps and outputs the ISI-corrected soft data, which then gets sliced. The sliced data is differentially-decoded and inverted to decode the NRZI encoding.
+
+Two receivers are instantiated in ais_decode.py, one for each channel, by tuning the receiver to the center of both channels (162.000MHz) and using frequency-xlating filters to shift either channel to baseband.
+
+
+Future improvements
+-------------------
+I'm sort of an idiot, so some of the coefficients (specifically in the front-end filters, DFE, and clock recovery) are optimized by hand based on recorded data. If you're really bright and would like to mathematically determine more proper coefficients for the various blocks, please, be my guest.
+
+In addition, there is no carrier recovery in this version. Future versions should use a PLL or something to make sure the demodulated signal lies at baseband. The system as it stands is rather sensitive to carrier offset, so the user has to specify an error offset using the -e option in order to precisely center the demodulated signal. I'll work on this. If you know how this should be implemented, feel free to let me know.
+
+If you're really good at this sort of thing, the optimal receiver for GMSK is a coherent demodulator using the Viterbi algorithm on a combined trellis. The gr-trellis module by Achilleas Anastasopolous includes basically everything necessary to do this except carrier synchronization. I personally can't figure it out to save my life. If you wanted to extend gr-trellis to include carrier synchronization, I'd be a big fan, or if you were interested in patiently holding my hand to teach me how to do this I'd be even happier. Actually, even using the quadrature demodulator to feed a Viterbi equalizer using gr-trellis should get you 1-2 dB of coding gain over the decision-feedback equalizer currently used. Again, I can't figure out how to make that work within this framework.
+
+I'd love comments, feedback, or suggestions for improvement.
+
+
+
+
