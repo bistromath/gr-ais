@@ -9,7 +9,7 @@
 from gnuradio import gr, gru, blks2, optfir
 from gnuradio import eng_notation
 from gnuradio import ais
-from gnuradio import usrp
+from gnuradio import uhd
 from ais_demod import * #use the local copy for now, not that it's particularly complicated
 #from ais_parser import *
 from optparse import OptionParser
@@ -33,11 +33,11 @@ class top_block_runner(_threading.Thread):
         self.tb.run()
         self.done = True
 
-def pick_subdevice(u):
+#def pick_subdevice(u):
 #this should pick which USRP subdevice if none was specified on the command line
-	return usrp.pick_subdev(u, (usrp_dbid.TV_RX_REV_3,
-							usrp_dbid.TV_RX_REV_2,
-				    	    usrp_dbid.BASIC_RX))
+#	return usrp.pick_subdev(u, (usrp_dbid.TV_RX_REV_3,
+#							usrp_dbid.TV_RX_REV_2,
+#				    	    usrp_dbid.BASIC_RX))
 
 class my_top_block(gr.top_block):
 	def __init__(self, options, queue):
@@ -45,17 +45,14 @@ class my_top_block(gr.top_block):
 
 		if options.filename is not None:
 			self.u = gr.file_source(gr.sizeof_gr_complex, options.filename)
-			options.rate = 64e6 / options.decim #from file
 		else:
-			self.u = usrp.source_c()
-			if options.rx_subdev_spec is None:
-				options.rx_subdev_spec = pick_subdevice(self.u)
+			self.u = uhd.usrp_source(options.addr,
+									io_type=uhd.io_type.COMPLEX_FLOAT32,
+									num_channels=1)
 	
-			self.u.set_mux(usrp.determine_rx_mux_value(self.u, options.rx_subdev_spec))
-			self.subdev = usrp.selected_subdev(self.u, options.rx_subdev_spec)
-			#print "Using RX d'board %s" % self.subdev.side_and_name()
-			self.u.set_decim_rate(options.decim)
-			options.rate = self.u.adc_rate() / options.decim
+			if options.subdev is not None:
+				self.u.set_subdev_spec(options.subdev, 0)
+			self.u.set_samp_rate(options.rate)
 
 			self._freq_offset = options.error
 			#print "Frequency offset is %i" % self._freq_offset
@@ -65,12 +62,11 @@ class my_top_block(gr.top_block):
 				print "Failed to set initial frequency"
 
 			if options.gain is None: #set to halfway
-				g = self.subdev.gain_range()
-				options.gain = (g[0]+g[1]) / 2.0
+				g = self.u.get_gain_range()
+				options.gain = (g.start()+g.stop()) / 2.0
 
 			#print "Setting gain to %i" % options.gain
-			self.subdev.set_gain(options.gain)
-			#self.subdev.set_bw(self.options.bandwidth) #only for DBSRX
+			self.u.set_gain(options.gain)
 
 
 		#here we're setting up TWO receivers, designated A and B. A is on 161.975, B is on 162.025. they both output data to the queue.
@@ -80,12 +76,8 @@ class my_top_block(gr.top_block):
 
 		
 	def tune(self, freq):
-		result = usrp.tune(self.u, 0, self.subdev, freq)
-		if result:
-			# Use residual_freq in s/w freq translater
-			#self.ddc.set_center_freq(-result.residual_freq)
-			#print "residual_freq =", result.residual_freq
-			return True
+		result = self.u.set_center_freq(freq)
+		return True
 
 		return False
 
@@ -135,15 +127,19 @@ def main():
 	parser = OptionParser (option_class=eng_option, conflict_handler="resolve")
 	expert_grp = parser.add_option_group("Expert")
 
-	parser.add_option("-R", "--rx-subdev-spec", type="subdev",
-						help="select USRP Rx side A or B", metavar="SUBDEV")
+	parser.add_option("-a", "--addr", type="string",
+						help="UHD source address", default="type=usrp1")
+	parser.add_option("-s", "--subdev", type="string",
+						help="UHD subdev spec", default="B:")
+	parser.add_option("-A", "--antenna", type="string", default=None,
+						help="select Rx Antenna where appropriate")
 #	parser.add_option("-f", "--freq", type="eng_float", default=161.975e6,
 #						help="set receive frequency to MHz [default=%default]", metavar="FREQ")
 	parser.add_option("-e", "--error", type="eng_float", default=0,
 						help="set offset error of USRP [default=%default]")
 	parser.add_option("-g", "--gain", type="int", default=None,
 						help="set RF gain", metavar="dB")
-	parser.add_option("-d", "--decim", type="int", default=250,
+	parser.add_option("-r", "--rate", type="eng_float", default=256e3,
 						help="set fgpa decimation rate to DECIM [default=%default]")
 	parser.add_option("-F", "--filename", type="string", default=None,
 						help="read data from file instead of USRP")

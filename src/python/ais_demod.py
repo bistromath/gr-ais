@@ -11,6 +11,7 @@ from gnuradio import eng_notation
 from gnuradio import ais
 from gnuradio import trellis
 from gnuradio import window
+import fsm_utils
 
 #from gmskenhanced import gmsk_demod
 #from gmskmod import gmsk_demod
@@ -18,7 +19,6 @@ import numpy
 import scipy
 import scipy.stats
 import math
-from gnuradio import fsm_utils
 
 #make_gmsk uses make_cpm_signals to create GMSK signals for a given samples per symbol and BT.
 #based on (copied from) Achilleas Anastasopoulos's test_cpm.py
@@ -108,12 +108,12 @@ class ais_demod(gr.hier_block2):
 			self.clockrec = gr.clock_recovery_mm_cc(samples_per_symbol_clockrec, 0.005*0.005*0.25, 0.5, 0.005, 0.0005) #might have to futz with the max. deviation
 			(fsm, constellation, MF, N, f0T) = make_gmsk(samples_per_symbol_viterbi, BT) #calculate the decomposition required for demodulation
 			self.costas = gr.costas_loop_cc(0.015, 0.015*0.015*0.25, 100e-6, -100e-6, 4) #does fine freq/phase synchronization. should probably calc the coeffs instead of hardcode them.
-			self.streams2stream = gr.streams_to_stream(gr.sizeof_gr_complex*1, N)
+			self.streams2stream = gr.streams_to_stream(int(gr.sizeof_gr_complex*1), int(N))
 			self.mf0 = gr.fir_filter_ccc(samples_per_symbol_viterbi, MF[0].conjugate()) #two matched filters for decomposition
 			self.mf1 = gr.fir_filter_ccc(samples_per_symbol_viterbi, MF[1].conjugate())
 			self.fo = gr.sig_source_c(samples_per_symbol_viterbi, gr.GR_COS_WAVE, -f0T, 1, 0) #the memoryless modulation component of the decomposition
 			self.fomult = gr.multiply_cc(1)
-			self.trellis = trellis.viterbi_combined_cb(fsm, 9600, -1, -1, N, constellation, trellis.TRELLIS_EUCLIDEAN) #the actual Viterbi decoder
+			self.trellis = trellis.viterbi_combined_cb(fsm, 9600, -1, -1, int(N), constellation, trellis.TRELLIS_EUCLIDEAN) #the actual Viterbi decoder
 
 		else:
 		#this is probably not optimal and someone who knows what they're doing should correct me
