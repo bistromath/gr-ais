@@ -3,13 +3,59 @@
 #implements a hierarchical class to demodulate GMSK packets as per AIS, including differential decoding and bit inversion for NRZI.
 #does not unstuff bits
 
+#modified 4/29/10 to include frequency estimation to center signals at baseband
+#eventually will do coherent demodulation
+#right now, it does coherent demod, but it's crippled for two reasons.
+#first, there's no "reset" input on the gr-trellis VA, so the algorithm doesn't get properly initialized at the start of a packet
+#second, there's no provision for phase estimation, so the combined trellis assumes each packet starts at phase=0.
+#sometimes it'll cope with this, but it loses a lot of packets
+
 from gnuradio import gr, gru, blks2
 from gnuradio import eng_notation
 from gnuradio import ais
 from gnuradio import trellis
+from gnuradio import window
+import fsm_utils
+
 #from gmskenhanced import gmsk_demod
 #from gmskmod import gmsk_demod
-from math import pi
+import numpy
+import scipy
+import scipy.stats
+import math
+
+#make_gmsk uses make_cpm_signals to create GMSK signals for a given samples per symbol and BT.
+#based on (copied from) Achilleas Anastasopoulos's test_cpm.py
+#uses his method of CPM decomposition
+#returns an FSM, a constellation, the required matched filters, N (the length of the required trellis), and f0T (the memoryless modulation component frequency)
+def make_gmsk(samples_per_symbol, BT):
+	#M, K, P, h, L are fixed for GMSK
+	M = 2 #number of bits per symbol
+	K = 1
+	P = 2 #h=K/P, K and P are relatively prime
+	h = (1.0*K)/P
+	L = 3
+	Q = samples_per_symbol
+	frac = 0.99 #fractional energy component deemed necessary to consider in the trellis, for finding dimensionality
+
+	fsm = trellis.fsm(P, M, L)
+
+	tt=numpy.arange(0,L*Q)/(1.0*Q)-L/2.0
+	p=(0.5*scipy.stats.erfc(2*math.pi*BT*(tt-0.5)/math.sqrt(math.log(2.0))/math.sqrt(2.0))-0.5*scipy.stats.erfc(2*math.pi*BT*(tt+0.5)/math.sqrt(math.log(2.0))/math.sqrt(2.0)))/2.0
+	p=p/sum(p)*Q/2.0
+	q=numpy.cumsum(p)/Q
+	q=q/q[-1]/2.0
+	(f0T,SS,S,F,Sf,Ff,N) = fsm_utils.make_cpm_signals(K,P,M,L,q,frac)
+	constellation = numpy.reshape(numpy.transpose(Sf),N*fsm.O())
+	Ffa = numpy.insert(Ff,Q,numpy.zeros(N),axis=0)
+	MF = numpy.fliplr(numpy.transpose(Ffa))
+
+	return (fsm, constellation, MF, N, f0T)
+
+def gcd(a, b):
+    if a > b: a, b = b, a
+    while a > 0: a, b = (b % a), a
+    return b
 
 class ais_demod(gr.hier_block2):
     def __init__(self, options):
@@ -19,52 +65,111 @@ class ais_demod(gr.hier_block2):
                                 gr.io_signature(1, 1, gr.sizeof_char)) # Output signature
 
 		self._samples_per_symbol = options.samples_per_symbol
-		self._syms_per_sec = options.syms_per_sec
+		self._bits_per_sec = options.bits_per_sec
+		self._samplerate = self._samples_per_symbol * self._bits_per_sec
 		self._gain_mu = options.gain_mu
 		self._mu = options.mu
 		self._omega_relative_limit = options.omega_relative_limit
+		self.fftlen = options.fftlen
 
-		#you want an improvement, get some carrier tracking in there so the clockrec can work at baseband.
-		#and if you're going to do that, hell, you might as well do coherent demod
+		#right now we are going to hardcode the different options for VA mode here. later on we can use configurable options
+		samples_per_symbol_viterbi = 2
+		bits_per_symbol = 2
+		samples_per_symbol = 6
+		samples_per_symbol_clockrec = samples_per_symbol / bits_per_symbol
+		BT = 0.4
+		data_rate = 9600.0
+		samp_rate = options.samp_rate
 
+		#so right here we'll put in some frequency estimation.
+		#this is just the old square-and-fft method
+		#ais.freqest is simply looking for peaks spaced bits-per-sec apart
+		self.square = gr.multiply_cc(1)
+		self.fftvect = gr.stream_to_vector(gr.sizeof_gr_complex, self.fftlen)
+		self.fft = gr.fft_vcc(self.fftlen, True, window.hamming(self.fftlen), True)
+		self.freqest = ais.freqest(int(self._samplerate), int(self._bits_per_sec), self.fftlen)
+		self.repeat = gr.repeat(gr.sizeof_float, self.fftlen)
+		self.fm = gr.frequency_modulator_fc(-1.0/(float(self._samplerate)/(2*math.pi)))
+		self.mix = gr.multiply_cc(1)
+
+		if(options.viterbi is True):
+			#calculate the required decimation and interpolation to achieve the desired samples per symbol
+			denom = gcd(data_rate*samples_per_symbol, samp_rate)
+			cr_interp = int(data_rate*samples_per_symbol/denom)
+			cr_decim = int(samp_rate/denom)
+
+			print "Using Viterbi decoder"
+			print "Interpolation: %i Decimation: %i" % (cr_interp, cr_decim)
+
+			print "Data rate: %f" % data_rate
+			print "Samples per symbol (rate): %f" % samples_per_symbol
+			print "Viterbi samples per symbol: %f" % samples_per_symbol_viterbi
+			print "Clock recovery samples per symbol: %f" % samples_per_symbol_clockrec
+			print "Sample rate before resampling: %f" % samp_rate
+			print "Sample rate after resampling: %f" % (samp_rate * cr_interp / cr_decim)
+			self.resample = blks2.rational_resampler_ccc(cr_interp, cr_decim)
+			#here we take a different tack and use A.A.'s CPM decomposition technique
+			self.clockrec = gr.clock_recovery_mm_cc(samples_per_symbol_clockrec, 0.005*0.005*0.25, 0.5, 0.005, 0.0005) #might have to futz with the max. deviation
+			(fsm, constellation, MF, N, f0T) = make_gmsk(samples_per_symbol_viterbi, BT) #calculate the decomposition required for demodulation
+			self.costas = gr.costas_loop_cc(0.015, 0.015*0.015*0.25, 100e-6, -100e-6, 4) #does fine freq/phase synchronization. should probably calc the coeffs instead of hardcode them.
+			self.streams2stream = gr.streams_to_stream(int(gr.sizeof_gr_complex*1), int(N))
+			self.mf0 = gr.fir_filter_ccc(samples_per_symbol_viterbi, MF[0].conjugate()) #two matched filters for decomposition
+			self.mf1 = gr.fir_filter_ccc(samples_per_symbol_viterbi, MF[1].conjugate())
+			self.fo = gr.sig_source_c(samples_per_symbol_viterbi, gr.GR_COS_WAVE, -f0T, 1, 0) #the memoryless modulation component of the decomposition
+			self.fomult = gr.multiply_cc(1)
+			self.trellis = trellis.viterbi_combined_cb(fsm, 9600, -1, -1, int(N), constellation, trellis.TRELLIS_EUCLIDEAN) #the actual Viterbi decoder
+
+		else:
 		#this is probably not optimal and someone who knows what they're doing should correct me
-		self.datafiltertaps = gr.firdes.root_raised_cosine(10, #gain
-													  self._samples_per_symbol * self._syms_per_sec, #sample rate
-													  self._syms_per_sec, #symbol rate
-													  0.3, #alpha, same as BT?
+			self.datafiltertaps = gr.firdes.root_raised_cosine(10, #gain
+													  self._samplerate, #sample rate
+													  self._bits_per_sec, #symbol rate
+													  0.4, #alpha, same as BT?
 													  50) #no. of taps
 
-		self.datafilter = gr.fir_filter_fff(1, self.datafiltertaps)
+			self.datafilter = gr.fir_filter_fff(1, self.datafiltertaps)
 
-		sensitivity = (pi / 2) / self._samples_per_symbol
-		#print "Sensitivity is: %f" % sensitivity
-		self.demod = gr.quadrature_demod_cf(sensitivity) #param is gain
-		self.clockrec = gr.clock_recovery_mm_ff(self._samples_per_symbol,0.25*self._gain_mu*self._gain_mu,self._mu,self._gain_mu,self._omega_relative_limit)
-		self.training_correlator = gr.correlate_access_code_bb("1100110011001100", 0)
-		self.tcslicer = gr.binary_slicer_fb()
-
-		#so the DFE block below is based on the gr.lms_dfe block. it's extended to take a "reset" input from the correlator, because AIS packets are too short to
-		#train a decision-feedback equalizer adequately. so we essentially use the same packet a dozen times to train the DFE. when it gets a correlator hit,
-		#it resets its taps and delay lines to zero. it then loops over the first 150 bits of the packet 12 times, training the correlator, and then
-		#it runs through the whole packet (and onward) with the trained taps to cope with GMSK-induced (intentional) and channel-induced (unintentional) ISI.
-		#this gets me at least 3dB of coding gain over just a binary slicer. i have not tested this in a simulated channel to figure out what the gain is, but
-		#it definitely gets more hits than the binary slicer alone. for further improvement, a viterbi decoder would be a good idea.
-
-		self.dfe = ais.extended_lms_dfe_ff(0.010, #FF tap gain
+			sensitivity = (math.pi / 2) / self._samples_per_symbol
+			#print "Sensitivity is: %f" % sensitivity
+			self.demod = gr.quadrature_demod_cf(sensitivity) #param is gain
+			self.clockrec = gr.clock_recovery_mm_ff(self._samples_per_symbol,0.25*self._gain_mu*self._gain_mu,self._mu,self._gain_mu,self._omega_relative_limit)
+			self.tcslicer = gr.binary_slicer_fb()
+			self.dfe = ais.extended_lms_dfe_ff(0.010, #FF tap gain
 										   0.002, #FB tap gain
 										   4, #FF taps
 										   2) #FB taps
 
-		self.delay = gr.delay(gr.sizeof_float, 64+14) #the correlator delays 64 bits, and the LMS delays some as well.
-		self.slicer = gr.binary_slicer_fb()
+			self.delay = gr.delay(gr.sizeof_float, 64 + 16) #the correlator delays 64 bits, and the LMS delays some as well.
+			self.slicer = gr.binary_slicer_fb()
+			self.training_correlator = gr.correlate_access_code_bb("1100110011001100", 0)
+
 
 		self.diff = gr.diff_decoder_bb(2)
 
 		self.invert = ais.invert() #NRZI signal diff decoded and inverted should give original signal
 
-		self.connect(self, self.demod, self.datafilter, self.clockrec, self.tcslicer, self.training_correlator)
-		self.connect(self.clockrec, self.delay, (self.dfe, 0))
-		self.connect(self.training_correlator, (self.dfe, 1))
-		self.connect(self.dfe, self.slicer, self.diff, self.invert, self)
+		#this is the feedback branch
+		self.connect(self, (self.square, 0))
+		self.connect(self, (self.square, 1))
+		self.connect(self.square, self.fftvect, self.fft, self.freqest, self.repeat, self.fm, (self.mix, 1))
 
-#		self.connect(self, self.demod, self.datafilter, self.clockrec, self.slicer, self.diff, self.invert, self) #uncomment this line (and comment the last four) to skip the DFE and use a slicer alone.
+		#this is the forward branch
+		self.connect(self, (self.mix, 0))
+
+		if(options.viterbi is False):
+			self.connect(self.mix, self.demod)
+			self.connect(self.demod, self.datafilter, self.clockrec, self.tcslicer, self.training_correlator)
+			#self.connect(self.demod, self.datafilter, self.clockrec, self.slicer, self.diff, self.invert, self)
+			self.connect(self.clockrec, self.delay, (self.dfe, 0))
+			self.connect(self.training_correlator, (self.dfe, 1))
+			self.connect(self.dfe, self.slicer, self.diff, self.invert, self)
+
+		else:
+			self.connect(self.mix, self.costas, self.resample, self.clockrec)
+			self.connect(self.clockrec, (self.fomult, 0))
+			self.connect(self.fo, (self.fomult, 1))
+			self.connect(self.fomult, self.mf0)
+			self.connect(self.fomult, self.mf1)
+			self.connect(self.mf0, (self.streams2stream, 0))
+			self.connect(self.mf1, (self.streams2stream, 1))
+			self.connect(self.streams2stream, self.trellis, self.diff, self.invert, self)

@@ -27,7 +27,8 @@ grinclude_HEADERS =		\
 	ais_unstuff.h	\
 	ais_parse.h 	\
 	ais_shift.h		\
-	ais_extended_lms_dfe_ff.h
+	ais_extended_lms_dfe_ff.h \
+	ais_freqest.h
 
 ###################################
 # SWIG Python interface and library
@@ -52,7 +53,8 @@ ais_la_swig_sources = 	\
 	ais_unstuff.cc	\
 	ais_parse.cc	\
 	ais_shift.cc	\
-	ais_extended_lms_dfe_ff.cc
+	ais_extended_lms_dfe_ff.cc \
+	ais_freqest.cc
 
 # additional arguments to the SWIG command
 #howto_la_swig_args =		\

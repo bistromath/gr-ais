@@ -23,6 +23,10 @@ include $(top_srcdir)/Makefile.common
 
 EXTRA_DIST = run_tests.in
 
+ourpythondir = $(grpythondir)
+
+ourpython_PYTHON = \
+  fsm_utils.py
 
 TESTS = 				\
 	run_tests

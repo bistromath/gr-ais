@@ -9,7 +9,7 @@
 from gnuradio import gr, gru, blks2, optfir
 from gnuradio import eng_notation
 from gnuradio import ais
-from gnuradio import usrp
+from gnuradio import uhd
 from ais_demod import * #use the local copy for now, not that it's particularly complicated
 #from ais_parser import *
 from optparse import OptionParser
@@ -18,6 +18,7 @@ from usrpm import usrp_dbid
 
 #from pkt import *
 import time
+import sys
 import gnuradio.gr.gr_threading as _threading
 
 class top_block_runner(_threading.Thread):
@@ -32,11 +33,11 @@ class top_block_runner(_threading.Thread):
         self.tb.run()
         self.done = True
 
-def pick_subdevice(u):
+#def pick_subdevice(u):
 #this should pick which USRP subdevice if none was specified on the command line
-	return usrp.pick_subdev(u, (usrp_dbid.TV_RX_REV_3,
-							usrp_dbid.TV_RX_REV_2,
-				    	    usrp_dbid.BASIC_RX))
+#	return usrp.pick_subdev(u, (usrp_dbid.TV_RX_REV_3,
+#							usrp_dbid.TV_RX_REV_2,
+#				    	    usrp_dbid.BASIC_RX))
 
 class my_top_block(gr.top_block):
 	def __init__(self, options, queue):
@@ -44,17 +45,14 @@ class my_top_block(gr.top_block):
 
 		if options.filename is not None:
 			self.u = gr.file_source(gr.sizeof_gr_complex, options.filename)
-			options.rate = 64e6 / options.decim #from file
 		else:
-			self.u = usrp.source_c()
-			if options.rx_subdev_spec is None:
-				options.rx_subdev_spec = pick_subdevice(self.u)
+			self.u = uhd.usrp_source(options.addr,
+									io_type=uhd.io_type.COMPLEX_FLOAT32,
+									num_channels=1)
 	
-			self.u.set_mux(usrp.determine_rx_mux_value(self.u, options.rx_subdev_spec))
-			self.subdev = usrp.selected_subdev(self.u, options.rx_subdev_spec)
-			#print "Using RX d'board %s" % self.subdev.side_and_name()
-			self.u.set_decim_rate(options.decim)
-			options.rate = self.u.adc_rate() / options.decim
+			if options.subdev is not None:
+				self.u.set_subdev_spec(options.subdev, 0)
+			self.u.set_samp_rate(options.rate)
 
 			self._freq_offset = options.error
 			#print "Frequency offset is %i" % self._freq_offset
@@ -64,12 +62,11 @@ class my_top_block(gr.top_block):
 				print "Failed to set initial frequency"
 
 			if options.gain is None: #set to halfway
-				g = self.subdev.gain_range()
-				options.gain = (g[0]+g[1]) / 2.0
+				g = self.u.get_gain_range()
+				options.gain = (g.start()+g.stop()) / 2.0
 
 			#print "Setting gain to %i" % options.gain
-			self.subdev.set_gain(options.gain)
-			#self.subdev.set_bw(self.options.bandwidth) #only for DBSRX
+			self.u.set_gain(options.gain)
 
 
 		#here we're setting up TWO receivers, designated A and B. A is on 161.975, B is on 162.025. they both output data to the queue.
@@ -79,12 +76,8 @@ class my_top_block(gr.top_block):
 
 		
 	def tune(self, freq):
-		result = usrp.tune(self.u, 0, self.subdev, freq)
-		if result:
-			# Use residual_freq in s/w freq translater
-			#self.ddc.set_center_freq(-result.residual_freq)
-			#print "residual_freq =", result.residual_freq
-			return True
+		result = self.u.set_center_freq(freq)
+		return True
 
 		return False
 
@@ -92,24 +85,26 @@ class my_top_block(gr.top_block):
 		self.rate = options.rate
 		#print "Samples per second is %i" % self.rate
 		self.u = src
-		self.coeffs = gr.firdes.low_pass(1,self.rate,10000,1000)
+		self.coeffs = gr.firdes.low_pass(1,self.rate,12000,1000) #4/29/10: added 2k to skirts to allow wider frequency estimation leeway
 		self._filter_decimation = 4
 		self.filter = gr.freq_xlating_fir_filter_ccf(self._filter_decimation, 
 													 self.coeffs, 
 													 freq,
 													 self.rate)
 
-		self._syms_per_sec = 9600.0;
+		self.agc = gr.agc_cc(1e-4, 1.0, 1.0, 0.0) #doesn't seem to do much for me
 
-		self._samples_per_symbol = self.rate / self._filter_decimation / self._syms_per_sec
-		#print "Samples per symbol is %f" % (self._samples_per_symbol,)
+		self._bits_per_sec = 9600.0;
+
+		self._samples_per_symbol = self.rate / self._filter_decimation / self._bits_per_sec
 
 		options.samples_per_symbol = self._samples_per_symbol
-		options.gain_mu = 0.5
+		options.gain_mu = 0.7
 		options.mu=0.5
 		options.omega_relative_limit = 0.0001
-		options.syms_per_sec = self._syms_per_sec
-
+		options.bits_per_sec = self._bits_per_sec
+		options.fftlen = 4096 #trades off accuracy of freq estimation in presence of noise, vs. delay time.
+		options.samp_rate = self.rate / self._filter_decimation
 		self.demod = ais_demod(options) #ais_demod.py, hierarchical demodulation block, takes in complex baseband and spits out 1-bit packed bitstream
 		self.start_correlator = gr.correlate_access_code_bb("1010101010101010", 0) #should mark start of packet
 		self.stop_correlator = gr.correlate_access_code_bb("01111110", 0) #should mark start and end of packet
@@ -117,10 +112,9 @@ class my_top_block(gr.top_block):
 		self.unstuff = ais.unstuff() #ais_unstuff.cc, unstuffs data
 		self.parse = ais.parse(queue, designator) #ais_parse.cc, calculates CRC, parses data into ASCII message, moves data onto queue
 
-		self.connect(self.u, self.filter, self.demod, self.start_correlator, (self.shift, 0))#now, ais.shift takes the output of the first correlator and moves the flag to the second bit
+		self.connect(self.u, self.filter, self.agc, self.demod, self.start_correlator, (self.shift, 0))#ais.shift takes the output of the first correlator and moves the flag to the second bit
 		self.connect(self.demod, self.stop_correlator, (self.shift, 1)) #so we can encode another correlator flag bit into the stream
 		self.connect(self.shift, self.unstuff, self.parse) #parse posts messages to the queue, which the main loop reads and prints
-
 
 
 def main():
@@ -133,18 +127,24 @@ def main():
 	parser = OptionParser (option_class=eng_option, conflict_handler="resolve")
 	expert_grp = parser.add_option_group("Expert")
 
-	parser.add_option("-R", "--rx-subdev-spec", type="subdev",
-						help="select USRP Rx side A or B", metavar="SUBDEV")
+	parser.add_option("-a", "--addr", type="string",
+						help="UHD source address", default="type=usrp1")
+	parser.add_option("-s", "--subdev", type="string",
+						help="UHD subdev spec", default="B:")
+	parser.add_option("-A", "--antenna", type="string", default=None,
+						help="select Rx Antenna where appropriate")
 #	parser.add_option("-f", "--freq", type="eng_float", default=161.975e6,
 #						help="set receive frequency to MHz [default=%default]", metavar="FREQ")
 	parser.add_option("-e", "--error", type="eng_float", default=0,
 						help="set offset error of USRP [default=%default]")
 	parser.add_option("-g", "--gain", type="int", default=None,
 						help="set RF gain", metavar="dB")
-	parser.add_option("-d", "--decim", type="int", default=256,
+	parser.add_option("-r", "--rate", type="eng_float", default=256e3,
 						help="set fgpa decimation rate to DECIM [default=%default]")
 	parser.add_option("-F", "--filename", type="string", default=None,
 						help="read data from file instead of USRP")
+	parser.add_option("-v", "--viterbi", action="store_true", default=False,
+						help="Use optional coherent demodulation and Viterbi decoder")
 
 	#receive_path.add_options(parser, expert_grp)
 
@@ -166,6 +166,8 @@ def main():
 				sentence = msg.to_string()
 				#s = make_printable(sentence)
 				print sentence
+				sys.stdout.flush()
+
 #		tb.adjust_freq()
 			elif runner.done:
 				break
