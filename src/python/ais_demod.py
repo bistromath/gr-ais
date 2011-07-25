@@ -5,6 +5,10 @@
 
 #modified 4/29/10 to include frequency estimation to center signals at baseband
 #eventually will do coherent demodulation
+#right now, it does coherent demod, but it's crippled for two reasons.
+#first, there's no "reset" input on the gr-trellis VA, so the algorithm doesn't get properly initialized at the start of a packet
+#second, there's no provision for phase estimation, so the combined trellis assumes each packet starts at phase=0.
+#sometimes it'll cope with this, but it loses a lot of packets
 
 from gnuradio import gr, gru, blks2
 from gnuradio import eng_notation
@@ -77,16 +81,16 @@ class ais_demod(gr.hier_block2):
 		data_rate = 9600.0
 		samp_rate = options.samp_rate
 
-		#so right here we'll put in some carrier tracking.
-
+		#so right here we'll put in some frequency estimation.
+		#this is just the old square-and-fft method
+		#ais.freqest is simply looking for peaks spaced bits-per-sec apart
 		self.square = gr.multiply_cc(1)
 		self.fftvect = gr.stream_to_vector(gr.sizeof_gr_complex, self.fftlen)
-		self.fft = gr.fft_vcc(self.fftlen, True, window.blackmanharris(self.fftlen), True)
+		self.fft = gr.fft_vcc(self.fftlen, True, window.hamming(self.fftlen), True)
 		self.freqest = ais.freqest(int(self._samplerate), int(self._bits_per_sec), self.fftlen)
 		self.repeat = gr.repeat(gr.sizeof_float, self.fftlen)
 		self.fm = gr.frequency_modulator_fc(-1.0/(float(self._samplerate)/(2*math.pi)))
 		self.mix = gr.multiply_cc(1)
-		self.carrierdelay = gr.delay(gr.sizeof_gr_complex, 0) #this delay might not be required, and in fact could be detrimental. a small fixed delay might be more appropriate.
 
 		if(options.viterbi is True):
 			#calculate the required decimation and interpolation to achieve the desired samples per symbol
@@ -135,7 +139,7 @@ class ais_demod(gr.hier_block2):
 										   4, #FF taps
 										   2) #FB taps
 
-			self.delay = gr.delay(gr.sizeof_float, 64+14) #the correlator delays 64 bits, and the LMS delays some as well.
+			self.delay = gr.delay(gr.sizeof_float, 64 + 16) #the correlator delays 64 bits, and the LMS delays some as well.
 			self.slicer = gr.binary_slicer_fb()
 			self.training_correlator = gr.correlate_access_code_bb("1100110011001100", 0)
 
@@ -150,11 +154,12 @@ class ais_demod(gr.hier_block2):
 		self.connect(self.square, self.fftvect, self.fft, self.freqest, self.repeat, self.fm, (self.mix, 1))
 
 		#this is the forward branch
-		self.connect(self, self.carrierdelay, (self.mix, 0))
+		self.connect(self, (self.mix, 0))
 
 		if(options.viterbi is False):
 			self.connect(self.mix, self.demod)
 			self.connect(self.demod, self.datafilter, self.clockrec, self.tcslicer, self.training_correlator)
+			#self.connect(self.demod, self.datafilter, self.clockrec, self.slicer, self.diff, self.invert, self)
 			self.connect(self.clockrec, self.delay, (self.dfe, 0))
 			self.connect(self.training_correlator, (self.dfe, 1))
 			self.connect(self.dfe, self.slicer, self.diff, self.invert, self)
