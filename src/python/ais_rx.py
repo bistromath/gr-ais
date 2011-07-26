@@ -107,23 +107,22 @@ class my_top_block(gr.top_block):
 		options.fftlen = 4096 #trades off accuracy of freq estimation in presence of noise, vs. delay time.
 		options.samp_rate = self.rate / self._filter_decimation
 		self.demod = ais_demod(options) #ais_demod.py, hierarchical demodulation block, takes in complex baseband and spits out 1-bit packed bitstream
-		self.start_correlator = digital.digital.correlate_access_code_bb("1010101010101010", 0) #should mark start of packet
-		self.stop_correlator = digital.digital.correlate_access_code_bb("01111110", 0) #should mark start and end of packet
-		self.shift = ais.shift(); #used to combine the output of two correlators (start_correlator and stop_correlator), moves bit 1 -> bit 2
 		self.unstuff = ais.unstuff() #ais_unstuff.cc, unstuffs data
+		self.start_correlator = gr.correlate_access_code_tag_bb("1010101010101010", 0, "ais_preamble") #should mark start of packet
+		self.stop_correlator = gr.correlate_access_code_tag_bb("01111110", 0, "ais_frame") #should mark start and end of packet
 		self.parse = ais.parse(queue, designator) #ais_parse.cc, calculates CRC, parses data into ASCII message, moves data onto queue
 
-		self.connect(self.u, self.filter, self.agc, self.demod, self.start_correlator, (self.shift, 0))#ais.shift takes the output of the first correlator and moves the flag to the second bit
-		self.connect(self.demod, self.stop_correlator, (self.shift, 1)) #so we can encode another correlator flag bit into the stream
-		self.connect(self.shift, self.unstuff, self.parse) #parse posts messages to the queue, which the main loop reads and prints
+		self.connect(self.u,
+		             self.filter,
+		             self.agc,
+		             self.demod,
+		             self.unstuff,
+		             self.start_correlator,
+		             self.stop_correlator,
+		             self.parse) #parse posts messages to the queue, which the main loop reads and prints
 
 
 def main():
-	global n_rcvd, n_right
-
-	n_rcvd = 0
-	n_right = 0
-
 	# Create Options Parser:
 	parser = OptionParser (option_class=eng_option, conflict_handler="resolve")
 	expert_grp = parser.add_option_group("Expert")

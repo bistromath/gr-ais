@@ -33,16 +33,11 @@ typedef boost::shared_ptr<ais_parse> ais_parse_sptr;
 ais_parse_sptr ais_make_parse(gr_msg_queue_sptr queue, char designator);
 
 /*!
- * \brief flex parse description
+ * \brief ais packetizer/parser
  * \ingroup block
  */
 
 #define FIELD_DELIM ((unsigned char)128)
-
-#define AIS_IDLE 0x00
-#define AIS_WAITING_FOR_START 0x01
-#define AIS_DATA 0x02
-#define AIS_PARSING 0x04
 
 class ais_parse : public gr_sync_block
 {
@@ -52,28 +47,19 @@ private:
     ais_parse(gr_msg_queue_sptr queue, char designator);
 
     std::ostringstream d_payload; //message output
-	int d_bits[512]; //bits of data
-//	char d_unpacked_data[512]; //decoded bits
     gr_msg_queue_sptr d_queue;		  // Destination for decoded messages
 
-    int d_distance;
-	bool d_in_packet;
-	float d_freq;
-	unsigned long samplenum;
-	int d_state;
-	int d_datacount;
-	char d_designator;
+    char d_designator;
 
-	int d_num_stoplost;
-	int d_num_startlost;
-	int d_num_found;
+    int d_num_stoplost;
+    int d_num_startlost;
+    int d_num_found;
 
-	void parse_data();
-	void reverse_bit_order(int *data, int length);
-	unsigned short crc(int *buffer, unsigned int len);
-	unsigned long unpack(int *buffer, int start, int length);
-	char nmea_checksum(std::string buffer);
-	int bitswap(int *data, unsigned int len);
+    void parse_data(char *data, int len);
+    void reverse_bit_order(char *data, int length);
+    unsigned short crc(char *buffer, unsigned int len);
+    unsigned long unpack(char *buffer, int start, int length);
+    char nmea_checksum(std::string buffer);
     
 public:
     int work(int noutput_items,
