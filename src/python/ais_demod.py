@@ -86,7 +86,7 @@ class ais_demod(gr.hier_block2):
 		#ais.freqest is simply looking for peaks spaced bits-per-sec apart
 		self.square = gr.multiply_cc(1)
 		self.fftvect = gr.stream_to_vector(gr.sizeof_gr_complex, self.fftlen)
-		self.fft = gr.fft_vcc(self.fftlen, True, window.hamming(self.fftlen), True)
+		self.fft = gr.fft_vcc(self.fftlen, True, window.rectangular(self.fftlen), True)
 		self.freqest = ais.freqest(int(self._samplerate), int(self._bits_per_sec), self.fftlen)
 		self.repeat = gr.repeat(gr.sizeof_float, self.fftlen)
 		self.fm = gr.frequency_modulator_fc(-1.0/(float(self._samplerate)/(2*math.pi)))
@@ -117,14 +117,14 @@ class ais_demod(gr.hier_block2):
 			self.mf1 = gr.fir_filter_ccc(samples_per_symbol_viterbi, MF[1].conjugate())
 			self.fo = gr.sig_source_c(samples_per_symbol_viterbi, gr.GR_COS_WAVE, -f0T, 1, 0) #the memoryless modulation component of the decomposition
 			self.fomult = gr.multiply_cc(1)
-			self.trellis = trellis.viterbi_combined_cb(fsm, 9600, -1, -1, int(N), constellation, trellis.TRELLIS_EUCLIDEAN) #the actual Viterbi decoder
+			self.trellis = trellis.viterbi_combined_cb(fsm, int(data_rate), -1, -1, int(N), constellation, trellis.TRELLIS_EUCLIDEAN) #the actual Viterbi decoder
 
 		else:
 		#this is probably not optimal and someone who knows what they're doing should correct me
 			self.datafiltertaps = gr.firdes.root_raised_cosine(10, #gain
 													  self._samplerate, #sample rate
 													  self._bits_per_sec, #symbol rate
-													  0.4, #alpha, same as BT?
+													  BT, #alpha, same as BT?
 													  50) #no. of taps
 
 			self.datafilter = gr.fir_filter_fff(1, self.datafiltertaps)
