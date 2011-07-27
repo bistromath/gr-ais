@@ -51,7 +51,6 @@ ais_la_swig_sources = 	\
 	ais_invert.cc	\
 	ais_unstuff.cc	\
 	ais_parse.cc	\
-	ais_shift.cc	\
 	ais_extended_lms_dfe_ff.cc \
 	ais_freqest.cc
 
