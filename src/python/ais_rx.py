@@ -21,6 +21,7 @@ from usrpm import usrp_dbid
 import time
 import sys
 import gnuradio.gr.gr_threading as _threading
+import socket
 
 class top_block_runner(_threading.Thread):
     def __init__(self, tb):
@@ -45,7 +46,7 @@ class my_top_block(gr.top_block):
 		gr.top_block.__init__(self)
 
 		if options.filename is not None:
-			self.u = gr.file_source(gr.sizeof_gr_complex, options.filename)
+			self.u = gr.file_source(gr.sizeof_gr_complex, options.filename, True)
 		else:
 			self.u = uhd.usrp_source(options.addr,
 									io_type=uhd.io_type.COMPLEX_FLOAT32,
@@ -140,6 +141,8 @@ def main():
 						help="read data from file instead of USRP")
 	parser.add_option("-v", "--viterbi", action="store_true", default=False,
 						help="Use optional coherent demodulation and Viterbi decoder")
+	parser.add_option("-t", "--tcp", action="store_true", default=False,
+						help="Start a TCP server on port 9987 instead of outputting to stdout. Useful for gpsd.")
 
 	(options, args) = parser.parse_args ()
 
@@ -152,15 +155,40 @@ def main():
 	tb = my_top_block(options, queue)
 	runner = top_block_runner(tb)
 
+	conns = [] #active connections
+	if options.tcp is True:
+		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		s.bind(('', 9987))
+		s.listen(1)
+		s.setblocking(0)
+
 	try:
 		while 1:
+			if options.tcp is True:
+				try:
+					conn, addr = s.accept()
+					conns.append(conn)
+					print "Connections: ", len(conns)
+				except socket.error:
+					pass
+					
 			if not queue.empty_p():
 				msg = queue.delete_head() # Blocking read
 				sentence = msg.to_string()
-				print sentence
-				sys.stdout.flush()
+				if options.tcp is True:
+					for conn in conns[:]:
+						try:
+							conn.send(sentence + "\n")
+						except socket.error:
+							conns.remove(conn)
+							print "Connections: ", len(conns)
+				else:
+					print sentence
+					sys.stdout.flush()
 
 			elif runner.done:
+				if options.tcp is True:
+					s.close()
 				break
 			else:
 				time.sleep(0.1)
