@@ -78,8 +78,8 @@ int ais_parse::work(int noutput_items,
     if(VERBOSE) std::cout << "Found a start tag at " << start_mark << std::endl;
     
     //now look for an end tag within reasonable range of the preamble
-    get_tags_in_range(end_tags, 0, start_mark + 184, start_mark + 442, pmt::pmt_string_to_symbol("ais_frame"));
-    if(end_tags.size() == 0) return preamble_mark + 442 - abs_sample_cnt; //should update d_num_stoplost
+    get_tags_in_range(end_tags, 0, start_mark + 184, start_mark + 450, pmt::pmt_string_to_symbol("ais_frame"));
+    if(end_tags.size() == 0) return preamble_mark + 450 - abs_sample_cnt; //should update d_num_stoplost
     uint64_t end_mark = gr_tags::get_nitems(end_tags[0]);
     if(VERBOSE) std::cout << "Found an end tag at " << end_mark << std::endl;
 
