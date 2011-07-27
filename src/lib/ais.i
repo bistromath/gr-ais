@@ -6,7 +6,6 @@
 #include "ais_invert.h"
 #include "ais_unstuff.h"
 #include "ais_parse.h"
-#include "ais_shift.h"
 #include "ais_extended_lms_dfe_ff.h"
 #include "ais_freqest.h"
 %}
@@ -52,18 +51,6 @@ class ais_parse : public gr_sync_block
 {
 private:
 	ais_parse(gr_msg_queue_sptr queue, char designator);
-
-public:
-};
-
-GR_SWIG_BLOCK_MAGIC(ais,shift);
-
-ais_shift_sptr ais_make_shift();
-
-class ais_shift : public gr_sync_block
-{
-private:
-	ais_shift();
 
 public:
 };
