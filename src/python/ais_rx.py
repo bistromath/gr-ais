@@ -71,7 +71,6 @@ class my_top_block(gr.top_block):
 
 
 		#here we're setting up TWO receivers, designated A and B. A is on 161.975, B is on 162.025. they both output data to the queue.
-
 		self.ais_rx(self.u, 161.975e6 - 162.0e6, "A", options, queue);
 		self.ais_rx(self.u, 162.025e6 - 162.0e6, "B", options, queue);
 
@@ -84,27 +83,24 @@ class my_top_block(gr.top_block):
 
 	def ais_rx(self, src, freq, designator, options, queue):
 		self.rate = options.rate
-		#print "Samples per second is %i" % self.rate
 		self.u = src
-		self.coeffs = gr.firdes.low_pass(1,self.rate,12000,1000) #4/29/10: added 2k to skirts to allow wider frequency estimation leeway
+		self.coeffs = gr.firdes.low_pass(1,self.rate,7000,1000)
 		self._filter_decimation = 4
 		self.filter = gr.freq_xlating_fir_filter_ccf(self._filter_decimation, 
 													 self.coeffs, 
 													 freq,
 													 self.rate)
 
-		self.agc = gr.agc_cc(1e-4, 1.0, 1.0, 0.0) #doesn't seem to do much for me
-
 		self._bits_per_sec = 9600.0;
 
 		self._samples_per_symbol = self.rate / self._filter_decimation / self._bits_per_sec
 
 		options.samples_per_symbol = self._samples_per_symbol
-		options.gain_mu = 0.7
+		options.gain_mu = 0.3
 		options.mu=0.5
 		options.omega_relative_limit = 0.0001
 		options.bits_per_sec = self._bits_per_sec
-		options.fftlen = 4096 #trades off accuracy of freq estimation in presence of noise, vs. delay time.
+		options.fftlen = 2048 #trades off accuracy of freq estimation in presence of noise, vs. delay time.
 		options.samp_rate = self.rate / self._filter_decimation
 		self.demod = ais_demod(options) #ais_demod.py, hierarchical demodulation block, takes in complex baseband and spits out 1-bit packed bitstream
 		self.unstuff = ais.unstuff() #ais_unstuff.cc, unstuffs data
@@ -114,7 +110,6 @@ class my_top_block(gr.top_block):
 
 		self.connect(self.u,
 		             self.filter,
-		             self.agc,
 		             self.demod,
 		             self.unstuff,
 		             self.start_correlator,
@@ -146,8 +141,6 @@ def main():
 	parser.add_option("-v", "--viterbi", action="store_true", default=False,
 						help="Use optional coherent demodulation and Viterbi decoder")
 
-	#receive_path.add_options(parser, expert_grp)
-
 	(options, args) = parser.parse_args ()
 
 	if len(args) != 0:
@@ -164,17 +157,13 @@ def main():
 			if not queue.empty_p():
 				msg = queue.delete_head() # Blocking read
 				sentence = msg.to_string()
-				#s = make_printable(sentence)
 				print sentence
 				sys.stdout.flush()
 
-#		tb.adjust_freq()
 			elif runner.done:
 				break
 			else:
 				time.sleep(0.1)
-
-#		tb.run()
 
 	except KeyboardInterrupt:
 		tb.stop()

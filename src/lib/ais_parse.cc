@@ -72,14 +72,14 @@ int ais_parse::work(int noutput_items,
     if(VERBOSE) std::cout << "Found a preamble at " << preamble_mark << std::endl;
     
     //now look for a start tag within reasonable range of the preamble
-    get_tags_in_range(start_tags, 0, preamble_mark, preamble_mark + 50, pmt::pmt_string_to_symbol("ais_frame"));
-    if(start_tags.size() < 1) return preamble_mark + 60 - abs_sample_cnt; //nothing here, move on (should update d_num_startlost)
+    get_tags_in_range(start_tags, 0, preamble_mark, preamble_mark + 30, pmt::pmt_string_to_symbol("ais_frame"));
+    if(start_tags.size() < 1) return preamble_mark + 30 - abs_sample_cnt; //nothing here, move on (should update d_num_startlost)
     uint64_t start_mark = gr_tags::get_nitems(start_tags[0]);
     if(VERBOSE) std::cout << "Found a start tag at " << start_mark << std::endl;
     
     //now look for an end tag within reasonable range of the preamble
-    get_tags_in_range(end_tags, 0, start_mark + 192, start_mark + 450, pmt::pmt_string_to_symbol("ais_frame"));
-    if(end_tags.size() < 1) return preamble_mark + 450 - abs_sample_cnt; //should update d_num_stoplost
+    get_tags_in_range(end_tags, 0, start_mark + 192, start_mark + 440, pmt::pmt_string_to_symbol("ais_frame"));
+    if(end_tags.size() < 1) return preamble_mark + 440 - abs_sample_cnt; //should update d_num_stoplost
     uint64_t end_mark = gr_tags::get_nitems(end_tags[0]);
     if(VERBOSE) std::cout << "Found an end tag at " << end_mark << std::endl;
 
@@ -101,7 +101,10 @@ void ais_parse::parse_data(char *data, int len)
 
     char asciidata[255]; //168/6 bits per ascii char
     reverse_bit_order(data, len); //the AIS standard has bits come in backwards for some inexplicable reason
-    if(crc(data, len-8)) return; //don't make a message if crc fails
+    if(crc(data, len-8)) {
+	if(VERBOSE) std::cout << "Failed CRC!" << std::endl;
+	return; //don't make a message if crc fails
+    }
 
     for(int i = 0; i < len/6; i++) {
 	asciidata[i] = unpack(data, i*6, 6);
