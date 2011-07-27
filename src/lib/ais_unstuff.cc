@@ -66,6 +66,7 @@ ais_unstuff::ais_unstuff ()
 {
   set_relative_rate((double)(258.0/258.0));
   d_consecutive = 0;
+  set_output_multiple(1000);
   //printf("Calling constructor\n");
 }
 
@@ -98,28 +99,20 @@ ais_unstuff::general_work (int noutput_items,
 
   int j = 0;
   int i = 0;
-  //printf("Entering ais_unstuff::general_work with %i requested output items and %i offered input items\n", noutput_items, ninput_items[0]);
 
-  while(i < noutput_items){
-	//printf("i is %i\n", i);
-	//printf("\td_consecutive is %i\n", d_consecutive);
-	//printf("\tinput is %i\n", in[i]);
-	if(in[i] & 0x01) {//if bit 0 is set (the data bit)
-		d_consecutive++;
-	} else {
-		if(d_consecutive == 5) {
-			//printf("Tossing!\n");
-			i++;
-		}
-		d_consecutive = 0;
+  while(j < noutput_items && i < ninput_items[0]){
+    if(in[i] & 0x01) {//if bit 0 is set (the data bit)
+	d_consecutive++;
+    } else {
+	if(d_consecutive == 5) {
+	    i++;
 	}
-	if(i >= noutput_items) break;
-	out[j++] = in[i++];
+	d_consecutive = 0;
+    }
+    out[j++] = in[i++];
   }
 
-	//printf("Total in: %i, total out: %i\n", i, j);
   consume_each(i); //tell gnuradio how many input items we used
-//  ninput_items[0] = i;
   // Tell runtime system how many output items we produced.
   return j;
 }
