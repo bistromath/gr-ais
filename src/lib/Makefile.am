@@ -26,7 +26,6 @@ grinclude_HEADERS =		\
 	ais_invert.h	\
 	ais_unstuff.h	\
 	ais_parse.h 	\
-	ais_shift.h		\
 	ais_extended_lms_dfe_ff.h \
 	ais_freqest.h
 
