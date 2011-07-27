@@ -106,6 +106,8 @@ void ais_parse::parse_data(char *data, int len)
 	return; //don't make a message if crc fails
     }
 
+    len -= 24; //minus CRC, minus HDLC frame
+
     for(int i = 0; i < len/6; i++) {
 	asciidata[i] = unpack(data, i*6, 6);
 	if(asciidata[i] > 39) asciidata[i] += 8;
