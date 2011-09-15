@@ -122,11 +122,11 @@ class ais_demod(gr.hier_block2):
 
 		else:
 		#this is probably not optimal and someone who knows what they're doing should correct me
-			self.datafiltertaps = gr.firdes.root_raised_cosine(32, #gain
+			self.datafiltertaps = gr.firdes.root_raised_cosine(10, #gain
 													  self._samplerate*32, #sample rate
 													  self._bits_per_sec, #symbol rate
-													  BT, #alpha, same as BT?
-													  50) #no. of taps
+													  0.6, #alpha, same as BT?
+													  50*32) #no. of taps
 
 			self.datafilter = gr.fir_filter_fff(1, self.datafiltertaps)
 
@@ -135,7 +135,8 @@ class ais_demod(gr.hier_block2):
 			self.demod = gr.quadrature_demod_cf(sensitivity) #param is gain
 
 			#self.clockrec = gr.clock_recovery_mm_ff(self._samples_per_symbol,0.25*self._gain_mu*self._gain_mu,self._mu,self._gain_mu,self._omega_relative_limit)
-			self.clockrec = digital.pfb_clock_sync_fff(self._samples_per_symbol, 0.11, self.datafiltertaps, 32, 0, 1.15)
+
+			self.clockrec = digital.pfb_clock_sync_fff(self._samples_per_symbol, 0.3, self.datafiltertaps, 32, 0, 1.15)
 			self.tcslicer = digital.digital.binary_slicer_fb()
 			self.dfe = ais.extended_lms_dfe_ff(0.010, #FF tap gain
 										   0.002, #FB tap gain

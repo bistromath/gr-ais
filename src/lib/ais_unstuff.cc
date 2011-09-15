@@ -64,7 +64,7 @@ ais_unstuff::ais_unstuff ()
                    gr_make_io_signature (MIN_IN, MAX_IN, sizeof (char)),
                    gr_make_io_signature (MIN_OUT, MAX_OUT, sizeof (char)))
 {
-  set_relative_rate((double)(258.0/258.0));
+  set_relative_rate((double)1.0);
   d_consecutive = 0;
   set_output_multiple(1000);
   //printf("Calling constructor\n");

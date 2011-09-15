@@ -46,7 +46,7 @@ class my_top_block(gr.top_block):
 		gr.top_block.__init__(self)
 
 		if options.filename is not None:
-			self.u = gr.file_source(gr.sizeof_gr_complex, options.filename, True)
+			self.u = gr.file_source(gr.sizeof_gr_complex, options.filename)
 		else:
 			self.u = uhd.usrp_source(options.addr,
 									io_type=uhd.io_type.COMPLEX_FLOAT32,
@@ -101,7 +101,7 @@ class my_top_block(gr.top_block):
 		options.mu=0.5
 		options.omega_relative_limit = 0.0001
 		options.bits_per_sec = self._bits_per_sec
-		options.fftlen = 2048 #trades off accuracy of freq estimation in presence of noise, vs. delay time.
+		options.fftlen = 4096 #trades off accuracy of freq estimation in presence of noise, vs. delay time.
 		options.samp_rate = self.rate / self._filter_decimation
 		self.demod = ais_demod(options) #ais_demod.py, hierarchical demodulation block, takes in complex baseband and spits out 1-bit packed bitstream
 		self.unstuff = ais.unstuff() #ais_unstuff.cc, unstuffs data
@@ -173,18 +173,19 @@ def main():
 					pass
 					
 			if not queue.empty_p():
-				msg = queue.delete_head() # Blocking read
-				sentence = msg.to_string()
-				if options.tcp is True:
-					for conn in conns[:]:
-						try:
-							conn.send(sentence + "\n")
-						except socket.error:
-							conns.remove(conn)
-							print "Connections: ", len(conns)
-				else:
-					print sentence
-					sys.stdout.flush()
+				while not queue.empty_p():
+					msg = queue.delete_head() # Blocking read
+					sentence = msg.to_string()
+					if options.tcp is True:
+						for conn in conns[:]:
+							try:
+								conn.send(sentence + "\n")
+							except socket.error:
+								conns.remove(conn)
+								print "Connections: ", len(conns)
+					else:
+						print sentence
+						sys.stdout.flush()
 
 			elif runner.done:
 				if options.tcp is True:
