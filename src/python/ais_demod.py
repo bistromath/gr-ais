@@ -122,8 +122,8 @@ class ais_demod(gr.hier_block2):
 
 		else:
 		#this is probably not optimal and someone who knows what they're doing should correct me
-			self.datafiltertaps = gr.firdes.root_raised_cosine(10, #gain
-													  self._samplerate, #sample rate
+			self.datafiltertaps = gr.firdes.root_raised_cosine(32, #gain
+													  self._samplerate*32, #sample rate
 													  self._bits_per_sec, #symbol rate
 													  BT, #alpha, same as BT?
 													  50) #no. of taps
@@ -133,7 +133,9 @@ class ais_demod(gr.hier_block2):
 			sensitivity = (math.pi / 2) / self._samples_per_symbol
 			#print "Sensitivity is: %f" % sensitivity
 			self.demod = gr.quadrature_demod_cf(sensitivity) #param is gain
-			self.clockrec = digital.digital.clock_recovery_mm_ff(self._samples_per_symbol,0.25*self._gain_mu*self._gain_mu,self._mu,self._gain_mu,self._omega_relative_limit)
+
+			#self.clockrec = gr.clock_recovery_mm_ff(self._samples_per_symbol,0.25*self._gain_mu*self._gain_mu,self._mu,self._gain_mu,self._omega_relative_limit)
+			self.clockrec = digital.pfb_clock_sync_fff(self._samples_per_symbol, 0.11, self.datafiltertaps, 32, 0, 1.15)
 			self.tcslicer = digital.digital.binary_slicer_fb()
 			self.dfe = ais.extended_lms_dfe_ff(0.010, #FF tap gain
 										   0.002, #FB tap gain
@@ -159,11 +161,13 @@ class ais_demod(gr.hier_block2):
 
 		if(options.viterbi is False):
 			self.connect(self.mix, self.demod)
-			self.connect(self.demod, self.datafilter, self.clockrec, self.tcslicer, self.training_correlator)
+			#self.connect(self.demod, self.datafilter, self.clockrec, self.tcslicer, self.training_correlator)
+			#self.connect(self.demod, self.clockrec, self.tcslicer, self.training_correlator)
+			self.connect(self.demod, self.clockrec, self.slicer, self.diff, self.invert, self)
 			#self.connect(self.demod, self.datafilter, self.clockrec, self.slicer, self.diff, self.invert, self)
-			self.connect(self.clockrec, self.delay, (self.dfe, 0))
-			self.connect(self.training_correlator, (self.dfe, 1))
-			self.connect(self.dfe, self.slicer, self.diff, self.invert, self)
+			#self.connect(self.clockrec, self.delay, (self.dfe, 0))
+			#self.connect(self.training_correlator, (self.dfe, 1))
+			#self.connect(self.dfe, self.slicer, self.diff, self.invert, self)
 
 		else:
 			self.connect(self.mix, self.costas, self.resample, self.clockrec)
