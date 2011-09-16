@@ -11,11 +11,10 @@ from gnuradio import eng_notation
 from gnuradio import ais
 from gnuradio import uhd
 from gnuradio import digital
-from ais_demod import * #use the local copy for now, not that it's particularly complicated
+from ais_demod import *
 #from ais_parser import *
 from optparse import OptionParser
 from gnuradio.eng_option import eng_option
-from usrpm import usrp_dbid
 
 #from pkt import *
 import time
@@ -34,12 +33,6 @@ class top_block_runner(_threading.Thread):
     def run(self):
         self.tb.run()
         self.done = True
-
-#def pick_subdevice(u):
-#this should pick which USRP subdevice if none was specified on the command line
-#	return usrp.pick_subdev(u, (usrp_dbid.TV_RX_REV_3,
-#							usrp_dbid.TV_RX_REV_2,
-#				    	    usrp_dbid.BASIC_RX))
 
 class my_top_block(gr.top_block):
 	def __init__(self, options, queue):
@@ -124,9 +117,9 @@ def main():
 	expert_grp = parser.add_option_group("Expert")
 
 	parser.add_option("-a", "--addr", type="string",
-						help="UHD source address", default="type=usrp1")
+						help="UHD source address", default="")
 	parser.add_option("-s", "--subdev", type="string",
-						help="UHD subdev spec", default="B:")
+						help="UHD subdev spec", default=None)
 	parser.add_option("-A", "--antenna", type="string", default=None,
 						help="select Rx Antenna where appropriate")
 #	parser.add_option("-f", "--freq", type="eng_float", default=161.975e6,
