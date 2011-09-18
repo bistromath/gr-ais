@@ -17,6 +17,7 @@ from gnuradio import trellis
 from gnuradio import window
 from gnuradio import digital
 import fsm_utils
+import gmsk_sync
 
 #from gmskenhanced import gmsk_demod
 #from gmskmod import gmsk_demod
@@ -82,16 +83,7 @@ class ais_demod(gr.hier_block2):
 		data_rate = 9600.0
 		samp_rate = options.samp_rate
 
-		#so right here we'll put in some frequency estimation.
-		#this is just the old square-and-fft method
-		#ais.freqest is simply looking for peaks spaced bits-per-sec apart
-		self.square = gr.multiply_cc(1)
-		self.fftvect = gr.stream_to_vector(gr.sizeof_gr_complex, self.fftlen)
-		self.fft = gr.fft_vcc(self.fftlen, True, window.rectangular(self.fftlen), True)
-		self.freqest = ais.freqest(int(self._samplerate), int(self._bits_per_sec), self.fftlen)
-		self.repeat = gr.repeat(gr.sizeof_float, self.fftlen)
-		self.fm = gr.frequency_modulator_fc(-1.0/(float(self._samplerate)/(2*math.pi)))
-		self.mix = gr.multiply_cc(1)
+		self.gmsk_sync = gmsk_sync.square_and_fft_sync(self._samplerate, self._bits_per_sec, self.fftlen)
 
 		if(options.viterbi is True):
 			#calculate the required decimation and interpolation to achieve the desired samples per symbol
@@ -131,47 +123,32 @@ class ais_demod(gr.hier_block2):
 			self.datafilter = gr.fir_filter_fff(1, self.datafiltertaps)
 
 			sensitivity = (math.pi / 2) / self._samples_per_symbol
-			#print "Sensitivity is: %f" % sensitivity
 			self.demod = gr.quadrature_demod_cf(sensitivity) #param is gain
 
 			#self.clockrec = gr.clock_recovery_mm_ff(self._samples_per_symbol,0.25*self._gain_mu*self._gain_mu,self._mu,self._gain_mu,self._omega_relative_limit)
 
 			self.clockrec = digital.pfb_clock_sync_fff(self._samples_per_symbol, 0.3, self.datafiltertaps, 32, 0, 1.15)
-			self.tcslicer = digital.digital.binary_slicer_fb()
-			self.dfe = ais.extended_lms_dfe_ff(0.010, #FF tap gain
-										   0.002, #FB tap gain
-										   4, #FF taps
-										   2) #FB taps
+#			self.tcslicer = digital.digital.binary_slicer_fb()
+#			self.dfe = ais.extended_lms_dfe_ff(0.010, #FF tap gain
+#										   0.002, #FB tap gain
+#										   4, #FF taps
+#										   2) #FB taps
 
-			self.delay = gr.delay(gr.sizeof_float, 64 + 16) #the correlator delays 64 bits, and the LMS delays some as well.
-			self.slicer = digital.digital.binary_slicer_fb()
-			self.training_correlator = digital.digital.correlate_access_code_bb("1100110011001100", 0)
+#			self.delay = gr.delay(gr.sizeof_float, 64 + 16) #the correlator delays 64 bits, and the LMS delays some as well.
+#			self.slicer = digital.digital.binary_slicer_fb()
+#			self.training_correlator = digital.digital.correlate_access_code_bb("1100110011001100", 0)
 
 
 		self.diff = gr.diff_decoder_bb(2)
-
 		self.invert = ais.invert() #NRZI signal diff decoded and inverted should give original signal
 
-		#this is the feedback branch
-		self.connect(self, (self.square, 0))
-		self.connect(self, (self.square, 1))
-		self.connect(self.square, self.fftvect, self.fft, self.freqest, self.repeat, self.fm, (self.mix, 1))
-
-		#this is the forward branch
-		self.connect(self, (self.mix, 0))
+		self.connect(self, self.gmsk_sync)
 
 		if(options.viterbi is False):
-			self.connect(self.mix, self.demod)
-			#self.connect(self.demod, self.datafilter, self.clockrec, self.tcslicer, self.training_correlator)
-			#self.connect(self.demod, self.clockrec, self.tcslicer, self.training_correlator)
-			self.connect(self.demod, self.clockrec, self.slicer, self.diff, self.invert, self)
-			#self.connect(self.demod, self.datafilter, self.clockrec, self.slicer, self.diff, self.invert, self)
-			#self.connect(self.clockrec, self.delay, (self.dfe, 0))
-			#self.connect(self.training_correlator, (self.dfe, 1))
-			#self.connect(self.dfe, self.slicer, self.diff, self.invert, self)
+			self.connect(self.gmsk_sync, self.demod, self.clockrec, self.slicer, self.diff, self.invert, self)
 
 		else:
-			self.connect(self.mix, self.costas, self.resample, self.clockrec)
+			self.connect(self.gmsk_sync, self.costas, self.resample, self.clockrec)
 			self.connect(self.clockrec, (self.fomult, 0))
 			self.connect(self.fo, (self.fomult, 1))
 			self.connect(self.fomult, self.mf0)
