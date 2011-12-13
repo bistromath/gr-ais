@@ -90,16 +90,6 @@ class ais_demod(gr.hier_block2):
 			denom = gcd(data_rate*samples_per_symbol, samp_rate)
 			cr_interp = int(data_rate*samples_per_symbol/denom)
 			cr_decim = int(samp_rate/denom)
-
-			print "Using Viterbi decoder"
-			print "Interpolation: %i Decimation: %i" % (cr_interp, cr_decim)
-
-			print "Data rate: %f" % data_rate
-			print "Samples per symbol (rate): %f" % samples_per_symbol
-			print "Viterbi samples per symbol: %f" % samples_per_symbol_viterbi
-			print "Clock recovery samples per symbol: %f" % samples_per_symbol_clockrec
-			print "Sample rate before resampling: %f" % samp_rate
-			print "Sample rate after resampling: %f" % (samp_rate * cr_interp / cr_decim)
 			self.resample = blks2.rational_resampler_ccc(cr_interp, cr_decim)
 			#here we take a different tack and use A.A.'s CPM decomposition technique
 			self.clockrec = gr.clock_recovery_mm_cc(samples_per_symbol_clockrec, 0.005*0.005*0.25, 0.5, 0.005, 0.0005) #might have to futz with the max. deviation
@@ -125,19 +115,18 @@ class ais_demod(gr.hier_block2):
 			sensitivity = (math.pi / 2) / self._samples_per_symbol
 			self.demod = gr.quadrature_demod_cf(sensitivity) #param is gain
 
-			#self.clockrec = gr.clock_recovery_mm_ff(self._samples_per_symbol,0.25*self._gain_mu*self._gain_mu,self._mu,self._gain_mu,self._omega_relative_limit)
-
-			self.clockrec = digital.pfb_clock_sync_fff(self._samples_per_symbol, 0.3, self.datafiltertaps, 32, 0, 1.15)
-#			self.tcslicer = digital.digital.binary_slicer_fb()
-#			self.dfe = ais.extended_lms_dfe_ff(0.010, #FF tap gain
-#										   0.002, #FB tap gain
-#										   4, #FF taps
-#										   2) #FB taps
-
-#			self.delay = gr.delay(gr.sizeof_float, 64 + 16) #the correlator delays 64 bits, and the LMS delays some as well.
-#			self.slicer = digital.digital.binary_slicer_fb()
-#			self.training_correlator = digital.digital.correlate_access_code_bb("1100110011001100", 0)
-
+			#self.clockrec = digital.clock_recovery_mm_ff(self._samples_per_symbol,0.25*self._gain_mu*self._gain_mu,self._mu,self._gain_mu,self._omega_relative_limit)
+			self.clockrec = digital.pfb_clock_sync_fff(self._samples_per_symbol, 0.04, self.datafiltertaps, 32, 0, 1.15)
+			self.tcslicer = digital.binary_slicer_fb()
+			self.dfe = ais.extended_lms_dfe_ff(0.010, #FF tap gain
+										   0.002, #FB tap gain
+										   4, #FF taps
+										   2) #FB taps
+#
+			self.delay = gr.delay(gr.sizeof_float, 64 + 16) #the correlator delays 64 bits, and the LMS delays some as well.
+			self.slicer = digital.binary_slicer_fb()
+			self.training_correlator = digital.correlate_access_code_bb("1100110011001100", 0)
+#			self.cma = digital.cma_equalizer_cc
 
 		self.diff = gr.diff_decoder_bb(2)
 		self.invert = ais.invert() #NRZI signal diff decoded and inverted should give original signal
@@ -146,6 +135,10 @@ class ais_demod(gr.hier_block2):
 
 		if(options.viterbi is False):
 			self.connect(self.gmsk_sync, self.demod, self.clockrec, self.slicer, self.diff, self.invert, self)
+			#self.connect(self.gmsk_sync, self.demod, self.clockrec, self.tcslicer, self.training_correlator)
+			#self.connect(self.clockrec, self.delay, (self.dfe, 0))
+			#self.connect(self.training_correlator, (self.dfe, 1))
+			#self.connect(self.dfe, self.slicer, self.diff, self.invert, self)
 
 		else:
 			self.connect(self.gmsk_sync, self.costas, self.resample, self.clockrec)

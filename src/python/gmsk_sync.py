@@ -13,7 +13,6 @@ class square_and_fft_sync(gr.hier_block2):
                                 gr.io_signature(1, 1, gr.sizeof_gr_complex), # Input signature
                                 gr.io_signature(1, 1, gr.sizeof_gr_complex)) # Output signature
 
-        #so right here we'll put in some frequency estimation.
 		#this is just the old square-and-fft method
 		#ais.freqest is simply looking for peaks spaced bits-per-sec apart
 		self.square = gr.multiply_cc(1)
