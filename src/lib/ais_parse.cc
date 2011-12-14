@@ -29,7 +29,7 @@
 #include <iostream>
 #include <iomanip>
 #include <boost/foreach.hpp>
-#include <gr_tag_info.h>
+#include <gr_tags.h>
 
 #define VERBOSE 0
 
@@ -62,25 +62,25 @@ int ais_parse::work(int noutput_items,
 
     //look ma, no state machine
     //instead of iterating through in[] looking for things, we'll just pull up all the start/stop tags and use those to look for packets
-    std::vector<pmt::pmt_t> preamble_tags, start_tags, end_tags;
+    std::vector<gr_tag_t> preamble_tags, start_tags, end_tags;
     uint64_t abs_sample_cnt = nitems_read(0);
     get_tags_in_range(preamble_tags, 0, abs_sample_cnt, abs_sample_cnt + size, pmt::pmt_string_to_symbol("ais_preamble"));
     if(preamble_tags.size() == 0) return size; //sad trombone
     
     //look for start & end tags within a reasonable range
-    uint64_t preamble_mark = gr_tags::get_nitems(preamble_tags[0]);
+    uint64_t preamble_mark = preamble_tags[0].offset;
     if(VERBOSE) std::cout << "Found a preamble at " << preamble_mark << std::endl;
     
     //now look for a start tag within reasonable range of the preamble
     get_tags_in_range(start_tags, 0, preamble_mark, preamble_mark + 30, pmt::pmt_string_to_symbol("ais_frame"));
     if(start_tags.size() == 0) return preamble_mark + 30 - abs_sample_cnt; //nothing here, move on (should update d_num_startlost)
-    uint64_t start_mark = gr_tags::get_nitems(start_tags[0]);
+    uint64_t start_mark = start_tags[0].offset;
     if(VERBOSE) std::cout << "Found a start tag at " << start_mark << std::endl;
     
     //now look for an end tag within reasonable range of the preamble
     get_tags_in_range(end_tags, 0, start_mark + 184, start_mark + 450, pmt::pmt_string_to_symbol("ais_frame"));
     if(end_tags.size() == 0) return preamble_mark + 450 - abs_sample_cnt; //should update d_num_stoplost
-    uint64_t end_mark = gr_tags::get_nitems(end_tags[0]);
+    uint64_t end_mark = end_tags[0].offset;
     if(VERBOSE) std::cout << "Found an end tag at " << end_mark << std::endl;
 
     //now we've got a valid, framed packet
