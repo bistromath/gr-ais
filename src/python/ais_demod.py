@@ -15,6 +15,7 @@ from gnuradio import eng_notation
 from gnuradio import ais
 from gnuradio import trellis
 from gnuradio import window
+from gnuradio import digital
 import fsm_utils
 
 #from gmskenhanced import gmsk_demod
@@ -132,16 +133,16 @@ class ais_demod(gr.hier_block2):
 			sensitivity = (math.pi / 2) / self._samples_per_symbol
 			#print "Sensitivity is: %f" % sensitivity
 			self.demod = gr.quadrature_demod_cf(sensitivity) #param is gain
-			self.clockrec = gr.clock_recovery_mm_ff(self._samples_per_symbol,0.25*self._gain_mu*self._gain_mu,self._mu,self._gain_mu,self._omega_relative_limit)
-			self.tcslicer = gr.binary_slicer_fb()
+			self.clockrec = digital.digital.clock_recovery_mm_ff(self._samples_per_symbol,0.25*self._gain_mu*self._gain_mu,self._mu,self._gain_mu,self._omega_relative_limit)
+			self.tcslicer = digital.digital.binary_slicer_fb()
 			self.dfe = ais.extended_lms_dfe_ff(0.010, #FF tap gain
 										   0.002, #FB tap gain
 										   4, #FF taps
 										   2) #FB taps
 
 			self.delay = gr.delay(gr.sizeof_float, 64 + 16) #the correlator delays 64 bits, and the LMS delays some as well.
-			self.slicer = gr.binary_slicer_fb()
-			self.training_correlator = gr.correlate_access_code_bb("1100110011001100", 0)
+			self.slicer = digital.digital.binary_slicer_fb()
+			self.training_correlator = digital.digital.correlate_access_code_bb("1100110011001100", 0)
 
 
 		self.diff = gr.diff_decoder_bb(2)

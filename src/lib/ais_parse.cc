@@ -160,7 +160,7 @@ void ais_parse::parse_data()
 	//okay. the AIS CRC and the NMEA 0183 checksum are DIFFERENT THINGS. you VALIDATE the AIS CRC, and you CALCULATE the NMEA 0183 checksum.
 
 	char checksum = nmea_checksum(std::string(d_payload.str()));
-	d_payload << "*" << std::hex << int(checksum);
+	d_payload << "*" << std::setw(2) << std::setfill('0') << std::hex << std::uppercase << int(checksum);
 
 
 	gr_message_sptr msg = gr_make_message_from_string(std::string(d_payload.str()));
