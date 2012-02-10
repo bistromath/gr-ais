@@ -85,18 +85,11 @@ class my_top_block(gr.top_block):
 													 freq,
 													 self.rate)
 
-		self._bits_per_sec = 9600.0;
-
-		self._samples_per_symbol = self.rate / self._filter_decimation / self._bits_per_sec
-
-		options.samples_per_symbol = self._samples_per_symbol
-		options.gain_mu = 0.3
-		options.mu=0.5
-		options.omega_relative_limit = 0.0001
-		options.bits_per_sec = self._bits_per_sec
-		options.fftlen = 4096 #trades off accuracy of freq estimation in presence of noise, vs. delay time.
+		options.bits_per_sec = 9600.0
+		options.samples_per_symbol = self.rate / self._filter_decimation / options.bits_per_sec
+		options.fftlen = 1024 #trades off accuracy of freq estimation in presence of noise, vs. delay time.
 		options.samp_rate = self.rate / self._filter_decimation
-		self.demod = ais_demod(options) #ais_demod.py, hierarchical demodulation block, takes in complex baseband and spits out 1-bit packed bitstream
+		self.demod = ais_demod(options) #ais_demod.py, hierarchical demodulation block, takes in complex baseband and spits out 1-bit unpacked bitstream
 		self.unstuff = ais.unstuff() #ais_unstuff.cc, unstuffs data
 		self.start_correlator = gr.correlate_access_code_tag_bb("1010101010101010", 0, "ais_preamble") #should mark start of packet
 		self.stop_correlator = gr.correlate_access_code_tag_bb("01111110", 0, "ais_frame") #should mark start and end of packet
@@ -133,7 +126,7 @@ def main():
 	parser.add_option("-F", "--filename", type="string", default=None,
 						help="read data from file instead of USRP")
 	parser.add_option("-v", "--viterbi", action="store_true", default=False,
-						help="Use optional coherent demodulation and Viterbi decoder")
+						help="Use optional Viterbi MLSE")
 	parser.add_option("-t", "--tcp", action="store_true", default=False,
 						help="Start a TCP server on port 9987 instead of outputting to stdout. Useful for gpsd.")
 

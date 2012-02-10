@@ -32,7 +32,7 @@
 #include <gr_tags.h>
 #include <gr_ais_api.h>
 
-#define VERBOSE 0
+#define VERBOSE 1
 
 GR_AIS_API ais_parse_sptr ais_make_parse(gr_msg_queue_sptr queue, char designator)
 {
@@ -102,7 +102,7 @@ void ais_parse::parse_data(char *data, int len)
     char asciidata[255]; //168/6 bits per ascii char
     reverse_bit_order(data, len); //the AIS standard has bits come in backwards for some inexplicable reason
     if(crc(data, len)) {
-	if(VERBOSE) std::cout << "Failed CRC!" << std::endl;
+	if(VERBOSE) std::cout << "Failed CRC! Length " << len << std::endl;
 	return; //don't make a message if crc fails
     }
 
