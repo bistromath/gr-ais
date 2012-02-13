@@ -49,7 +49,7 @@ ais_parse::ais_parse(gr_msg_queue_sptr queue, char designator) :
     d_num_stoplost = 0;
     d_num_startlost = 0;
     d_num_found = 0;
-    set_output_multiple(1000);
+    set_output_multiple(10000);
 }
 
 int ais_parse::work(int noutput_items,

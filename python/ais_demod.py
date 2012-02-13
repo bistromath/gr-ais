@@ -4,7 +4,8 @@
 
 from gnuradio import gr, gru, blks2
 from gnuradio import eng_notation
-from gnuradio import ais
+#from gnuradio import ais
+import gr_ais
 from gnuradio import trellis
 from gnuradio import window
 from gnuradio import digital
@@ -56,18 +57,30 @@ class ais_demod(gr.hier_block2):
 		self.gmsk_sync = gmsk_sync.square_and_fft_sync(self._samplerate, self._bits_per_sec, self.fftlen)
 		self.filtersections = 32
 		self.clockrec_sps = 1
+
+		#this is for the 
+		gain_mu = 0.03
+		mu = 0.5
+		omega_relative_limit = 0.05
+		
 		#self.datafiltertaps = gr.firdes.root_raised_cosine(1, #gain
 		#										  self._samplerate*self.filtersections, #sample rate
 		#										  self._bits_per_sec, #symbol rate
 		#										  BT, #alpha, same as BT?
 		#										  5*self.filtersections) #no. of taps
 
-		self.datafiltertaps = gr.firdes.gaussian(1, self._samplerate*self.filtersections / self._bits_per_sec, BT, 5*self.filtersections)
-		self.clockrec = gr.pfb_clock_sync_ccf(self._samples_per_symbol, 0.04, self.datafiltertaps, self.filtersections, 0, 1.15, self.clockrec_sps)
+		self.datafiltertaps = gr.firdes.gaussian(1, self._samples_per_symbol, BT, self.filtersections)
 
+		self.clockrec = gr.pfb_clock_sync_ccf(self._samples_per_symbol, gain_mu, self.datafiltertaps, self.filtersections, 0, 1.15, self.clockrec_sps)
+		#self.clockrec = digital.clock_recovery_mm_cc(self._samples_per_symbol,
+		#                                             0.25*gain_mu*gain_mu,
+		#                                             mu,
+		#                                             gain_mu,
+		#                                             omega_relative_limit)
+		                                             
+		self.datafilter = gr.fir_filter_ccf(1, self.datafiltertaps)
 		sensitivity = (math.pi / 2) / self._samples_per_symbol
 		self.demod = gr.quadrature_demod_cf(sensitivity) #param is gain
-		#self.clockrec = digital.clock_recovery_mm_ff(self._samples_per_symbol,0.25*self._gain_mu*self._gain_mu,self._mu,self._gain_mu,self._omega_relative_limit)
 		if(options.viterbi is True):
 			self.equalizer = va_equalizer(self.clockrec_sps, BT)
 			self.slicer = gr.keep_one_in_n(gr.sizeof_char, self.clockrec_sps)
@@ -76,7 +89,7 @@ class ais_demod(gr.hier_block2):
 			self.slicer = digital.digital.binary_slicer_fb()
 
 		self.diff = gr.diff_decoder_bb(2)
-		self.invert = ais.invert() #NRZI signal diff decoded and inverted should give original signal
+		self.invert = gr_ais.invert() #NRZI signal diff decoded and inverted should give original signal
 
 		self.connect(self, self.gmsk_sync)
 		self.connect(self.gmsk_sync, self.clockrec, self.demod, self.equalizer, self.slicer, self.diff, self.invert, self)

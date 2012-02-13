@@ -4,7 +4,7 @@ from gnuradio import gr
 from gnuradio import eng_notation
 from gnuradio import window
 from gnuradio import digital
-from gnuradio import ais
+import gr_ais
 from math import pi
 
 class square_and_fft_sync(gr.hier_block2):
@@ -18,7 +18,7 @@ class square_and_fft_sync(gr.hier_block2):
 		self.square = gr.multiply_cc(1)
 		self.fftvect = gr.stream_to_vector(gr.sizeof_gr_complex, fftlen)
 		self.fft = gr.fft_vcc(fftlen, True, window.rectangular(fftlen), True)
-		self.freqest = ais.freqest(int(samplerate), int(bits_per_sec), fftlen)
+		self.freqest = gr_ais.freqest(int(samplerate), int(bits_per_sec), fftlen)
 		self.repeat = gr.repeat(gr.sizeof_float, fftlen)
 		self.fm = gr.frequency_modulator_fc(-1.0/(float(samplerate)/(2*pi)))
 		self.mix = gr.multiply_cc(1)

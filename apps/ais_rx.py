@@ -8,11 +8,10 @@
 
 from gnuradio import gr, gru, blks2, optfir
 from gnuradio import eng_notation
-from gr_ais import *
+import gr_ais
 from gr_ais.ais_demod import *
 from gnuradio import uhd
 from gnuradio import digital
-#from ais_parser import *
 from optparse import OptionParser
 from gnuradio.eng_option import eng_option
 
@@ -90,10 +89,10 @@ class my_top_block(gr.top_block):
 		options.fftlen = 1024 #trades off accuracy of freq estimation in presence of noise, vs. delay time.
 		options.samp_rate = self.rate / self._filter_decimation
 		self.demod = ais_demod(options) #ais_demod.py, hierarchical demodulation block, takes in complex baseband and spits out 1-bit unpacked bitstream
-		self.unstuff = ais.unstuff() #ais_unstuff.cc, unstuffs data
+		self.unstuff = gr_ais.unstuff() #ais_unstuff.cc, unstuffs data
 		self.start_correlator = gr.correlate_access_code_tag_bb("1010101010101010", 0, "ais_preamble") #should mark start of packet
 		self.stop_correlator = gr.correlate_access_code_tag_bb("01111110", 0, "ais_frame") #should mark start and end of packet
-		self.parse = ais.parse(queue, designator) #ais_parse.cc, calculates CRC, parses data into ASCII message, moves data onto queue
+		self.parse = gr_ais.parse(queue, designator) #ais_parse.cc, calculates CRC, parses data into ASCII message, moves data onto queue
 
 		self.connect(self.u,
 		             self.filter,
