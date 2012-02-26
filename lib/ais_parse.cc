@@ -32,7 +32,7 @@
 #include <gr_tags.h>
 #include <gr_ais_api.h>
 
-#define VERBOSE 1
+#define VERBOSE 0
 
 GR_AIS_API ais_parse_sptr ais_make_parse(gr_msg_queue_sptr queue, char designator)
 {
@@ -65,6 +65,7 @@ int ais_parse::work(int noutput_items,
     //instead of iterating through in[] looking for things, we'll just pull up all the start/stop tags and use those to look for packets
     std::vector<gr_tag_t> preamble_tags, start_tags, end_tags;
     uint64_t abs_sample_cnt = nitems_read(0);
+    
     get_tags_in_range(preamble_tags, 0, abs_sample_cnt, abs_sample_cnt + size, pmt::pmt_string_to_symbol("ais_preamble"));
     if(preamble_tags.size() == 0) return size; //sad trombone
     

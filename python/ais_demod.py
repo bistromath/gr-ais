@@ -19,6 +19,7 @@ import scipy
 import scipy.stats
 import math
 
+#MLSE equalizer using a viterbi decoder on an estimated channel based on a Gaussian matched filter
 class va_equalizer(gr.hier_block2):
 	def __init__(self, sps, bt):
 		gr.hier_block2.__init__(self, "va_equalizer",
@@ -51,34 +52,21 @@ class ais_demod(gr.hier_block2):
 		self._samples_per_symbol = options.samples_per_symbol
 		self._bits_per_sec = options.bits_per_sec
 		self._samplerate = self._samples_per_symbol * self._bits_per_sec
-		self.fftlen = options.fftlen
 
 		BT = 0.35
-		self.gmsk_sync = gmsk_sync.square_and_fft_sync(self._samplerate, self._bits_per_sec, self.fftlen)
-		self.filtersections = 32
+		self.filtersections = 16
+		self.tapspersection = 30
 		self.clockrec_sps = 1
 
-		#this is for the 
 		gain_mu = 0.03
-		mu = 0.5
-		omega_relative_limit = 0.05
-		
-		#self.datafiltertaps = gr.firdes.root_raised_cosine(1, #gain
-		#										  self._samplerate*self.filtersections, #sample rate
-		#										  self._bits_per_sec, #symbol rate
-		#										  BT, #alpha, same as BT?
-		#										  5*self.filtersections) #no. of taps
 
-		self.datafiltertaps = gr.firdes.gaussian(1, self._samples_per_symbol, BT, self.filtersections)
+		self.fftlen = options.fftlen
+		self.gmsk_sync = gmsk_sync.square_and_fft_sync(self._samplerate, self._bits_per_sec, self.fftlen)
+		
+		self.datafiltertaps = gr.firdes.gaussian(1, self._samples_per_symbol*self.filtersections, BT, self.tapspersection*self.filtersections)
 
 		self.clockrec = gr.pfb_clock_sync_ccf(self._samples_per_symbol, gain_mu, self.datafiltertaps, self.filtersections, 0, 1.15, self.clockrec_sps)
-		#self.clockrec = digital.clock_recovery_mm_cc(self._samples_per_symbol,
-		#                                             0.25*gain_mu*gain_mu,
-		#                                             mu,
-		#                                             gain_mu,
-		#                                             omega_relative_limit)
-		                                             
-		self.datafilter = gr.fir_filter_ccf(1, self.datafiltertaps)
+		
 		sensitivity = (math.pi / 2) / self._samples_per_symbol
 		self.demod = gr.quadrature_demod_cf(sensitivity) #param is gain
 		if(options.viterbi is True):
@@ -96,10 +84,10 @@ class ais_demod(gr.hier_block2):
 
 
 		#debug shit
-		self.demod2=gr.quadrature_demod_cf(sensitivity)
-		self.fsink1 = gr.file_sink(gr.sizeof_float, "demod.dat")
-		self.connect(self.gmsk_sync, self.demod2, self.fsink1)
-		self.fsink2 = gr.file_sink(gr.sizeof_float, "clockrec.dat")
-		self.connect(self.demod, self.fsink2)
-		self.fsink3 = gr.file_sink(gr.sizeof_char, "equal.dat")
-		self.connect(self.equalizer, self.fsink3)
+		#self.demod2=gr.quadrature_demod_cf(sensitivity)
+		#self.fsink1 = gr.file_sink(gr.sizeof_float, "demod.dat")
+		#self.connect(self.gmsk_sync, self.demod2, self.fsink1)
+		#self.fsink2 = gr.file_sink(gr.sizeof_float, "clockrec.dat")
+		#self.connect(self.demod, self.fsink2)
+		#self.fsink3 = gr.file_sink(gr.sizeof_char, "equal.dat")
+		#self.connect(self.equalizer, self.fsink3)

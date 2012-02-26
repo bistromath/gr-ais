@@ -48,6 +48,10 @@ class my_top_block(gr.top_block):
 				self.u.set_subdev_spec(options.subdev, 0)
 			self.u.set_samp_rate(options.rate)
 
+			# Set the antenna
+			if(options.antenna):
+				self.u.set_antenna(options.antenna, 0)
+
 			self._freq_offset = options.error
 			#print "Frequency offset is %i" % self._freq_offset
 			self._actual_freq = 162.0e6 - self._freq_offset #tune between the two AIS freqs
@@ -71,8 +75,6 @@ class my_top_block(gr.top_block):
 	def tune(self, freq):
 		result = self.u.set_center_freq(freq)
 		return True
-
-		return False
 
 	def ais_rx(self, src, freq, designator, options, queue):
 		self.rate = options.rate
