@@ -39,7 +39,7 @@ class va_equalizer(gr.hier_block2):
 										 self.constellation,
 										 digital.TRELLIS_EUCLIDEAN
 										)
-		self.va = trellis.viterbi_b(self.fsm, 100000, -1, -1)
+		self.va = trellis.viterbi_b(self.fsm, 1000, -1, -1)
 		self.connect(self, self.metrics, self.va, self)
 
 class ais_demod(gr.hier_block2):
@@ -52,20 +52,23 @@ class ais_demod(gr.hier_block2):
 		self._samples_per_symbol = options.samples_per_symbol
 		self._bits_per_sec = options.bits_per_sec
 		self._samplerate = self._samples_per_symbol * self._bits_per_sec
+		print "samples per symbol: %f" % self._samples_per_symbol
 
 		BT = 0.35
-		self.filtersections = 16
-		self.tapspersection = 30
+		self.filtersections = 32
+		self.tapspersection = 64
 		self.clockrec_sps = 1
-
-		gain_mu = 0.03
+		
+		gain_mu = 0.25
 
 		self.fftlen = options.fftlen
 		self.gmsk_sync = gmsk_sync.square_and_fft_sync(self._samplerate, self._bits_per_sec, self.fftlen)
 		
-		self.datafiltertaps = gr.firdes.gaussian(1, self._samples_per_symbol*self.filtersections, BT, self.tapspersection*self.filtersections)
+		#self.datafiltertaps = gr.firdes.gaussian(1, self._samples_per_symbol*self.filtersections, BT, self.tapspersection*self.filtersections)
+		self.datafiltertaps = gr.firdes.gaussian(self.filtersections, self._samples_per_symbol, BT, self.tapspersection*self.filtersections)
 
-		self.clockrec = gr.pfb_clock_sync_ccf(self._samples_per_symbol, gain_mu, self.datafiltertaps, self.filtersections, 0, 1.15, self.clockrec_sps)
+		#self.clockrec = gr.pfb_clock_sync_ccf(self._samples_per_symbol/self.clockrec_sps, gain_mu, self.datafiltertaps, self.filtersections, 0, 1.15, 1)
+		self.clockrec = gr.pfb_clock_sync_fff(self._samples_per_symbol, gain_mu, self.datafiltertaps, self.filtersections, 0, 1.15)
 		
 		sensitivity = (math.pi / 2) / self._samples_per_symbol
 		self.demod = gr.quadrature_demod_cf(sensitivity) #param is gain
@@ -73,14 +76,15 @@ class ais_demod(gr.hier_block2):
 			self.equalizer = va_equalizer(self.clockrec_sps, BT)
 			self.slicer = gr.keep_one_in_n(gr.sizeof_char, self.clockrec_sps)
 		else:
-			self.equalizer = gr.copy(gr.sizeof_float)
+			self.equalizer = gr.keep_one_in_n(gr.sizeof_float, self.clockrec_sps)
 			self.slicer = digital.digital.binary_slicer_fb()
 
 		self.diff = gr.diff_decoder_bb(2)
 		self.invert = gr_ais.invert() #NRZI signal diff decoded and inverted should give original signal
 
 		self.connect(self, self.gmsk_sync)
-		self.connect(self.gmsk_sync, self.clockrec, self.demod, self.equalizer, self.slicer, self.diff, self.invert, self)
+		#self.connect(self.gmsk_sync, self.clockrec, self.demod, self.equalizer, self.slicer, self.diff, self.invert, self)
+		self.connect(self.gmsk_sync, self.demod, self.clockrec, self.equalizer, self.slicer, self.diff, self.invert, self)
 
 
 		#debug shit
