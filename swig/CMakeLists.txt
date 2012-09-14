@@ -57,5 +57,5 @@ install(
     FILES
     gr_ais_swig.i
     ${CMAKE_CURRENT_BINARY_DIR}/gr_ais_swig_doc.i
-    DESTINATION $(GR_INCLUDE_DIR)/gr_ais/swig
+    DESTINATION ${GR_INCLUDE_DIR}/gr_ais/swig
 )
