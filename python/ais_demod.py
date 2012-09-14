@@ -12,10 +12,10 @@
 
 from gnuradio import gr, gru, blks2
 from gnuradio import eng_notation
-from gnuradio import ais
 from gnuradio import trellis
 from gnuradio import window
 from gnuradio import digital
+import gr_ais_swig as ais
 import fsm_utils
 import gmsk_sync
 
