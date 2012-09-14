@@ -4,8 +4,9 @@ from gnuradio import gr
 from gnuradio import eng_notation
 from gnuradio import window
 from gnuradio import digital
-from gnuradio import ais
 from math import pi
+import gr_ais_swig as ais
+
 
 class square_and_fft_sync(gr.hier_block2):
     def __init__(self, samplerate, bits_per_sec, fftlen):
