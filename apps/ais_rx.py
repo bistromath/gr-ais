@@ -173,6 +173,8 @@ def main():
 						for conn in conns[:]:
 							try:
 								conn.send(sentence + "\n")
+								#use this for Windows based clients like Shipplotter
+								#conn.send(sentence + "\r\n")
 							except socket.error:
 								conns.remove(conn)
 								print "Connections: ", len(conns)
