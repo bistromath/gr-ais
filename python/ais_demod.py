@@ -10,8 +10,7 @@
 #second, there's no provision for phase estimation, so the combined trellis assumes each packet starts at phase=0.
 #sometimes it'll cope with this, but it loses a lot of packets
 
-from gnuradio import gr, gru, blks2
-from gnuradio import eng_notation
+from gnuradio import gr, blks2, filter
 from gnuradio import trellis
 from gnuradio import window
 from gnuradio import digital
@@ -96,8 +95,8 @@ class ais_demod(gr.hier_block2):
 			(fsm, constellation, MF, N, f0T) = make_gmsk(samples_per_symbol_viterbi, BT) #calculate the decomposition required for demodulation
 			self.costas = gr.costas_loop_cc(0.015, 0.015*0.015*0.25, 100e-6, -100e-6, 4) #does fine freq/phase synchronization. should probably calc the coeffs instead of hardcode them.
 			self.streams2stream = gr.streams_to_stream(int(gr.sizeof_gr_complex*1), int(N))
-			self.mf0 = gr.fir_filter_ccc(samples_per_symbol_viterbi, MF[0].conjugate()) #two matched filters for decomposition
-			self.mf1 = gr.fir_filter_ccc(samples_per_symbol_viterbi, MF[1].conjugate())
+			self.mf0 = filter.fir_filter_ccc(samples_per_symbol_viterbi, MF[0].conjugate()) #two matched filters for decomposition
+			self.mf1 = filter.fir_filter_ccc(samples_per_symbol_viterbi, MF[1].conjugate())
 			self.fo = gr.sig_source_c(samples_per_symbol_viterbi, gr.GR_COS_WAVE, -f0T, 1, 0) #the memoryless modulation component of the decomposition
 			self.fomult = gr.multiply_cc(1)
 			self.trellis = trellis.viterbi_combined_cb(fsm, int(data_rate), -1, -1, int(N), constellation, trellis.TRELLIS_EUCLIDEAN) #the actual Viterbi decoder
@@ -110,13 +109,13 @@ class ais_demod(gr.hier_block2):
 													  0.4, #alpha, same as BT?
 													  50*32) #no. of taps
 
-			self.datafilter = gr.fir_filter_fff(1, self.datafiltertaps)
+			self.datafilter = filter.fir_filter_fff(1, self.datafiltertaps)
 
 			sensitivity = (math.pi / 2) / self._samples_per_symbol
 			self.demod = gr.quadrature_demod_cf(sensitivity) #param is gain
 
 			#self.clockrec = digital.clock_recovery_mm_ff(self._samples_per_symbol,0.25*self._gain_mu*self._gain_mu,self._mu,self._gain_mu,self._omega_relative_limit)
-			self.clockrec = gr.pfb_clock_sync_ccf(self._samples_per_symbol, 0.04, self.datafiltertaps, 32, 0, 1.15)
+			self.clockrec = digital.pfb_clock_sync_ccf(self._samples_per_symbol, 0.04, self.datafiltertaps, 32, 0, 1.15)
 			self.tcslicer = digital.digital.binary_slicer_fb()
 #			self.dfe = digital.digital.lms_dd_equalizer_cc(
 #										   32,
@@ -132,7 +131,7 @@ class ais_demod(gr.hier_block2):
 #just a note here: a complex combined quad demod/slicer could be based on if's rather than an actual quad demod, right?
 #in fact all the constellation decoders up to QPSK could operate on complex data w/o doing the whole atan thing
 
-		self.diff = gr.diff_decoder_bb(2)
+		self.diff = digital.diff_decoder_bb(2)
 		self.invert = ais.invert() #NRZI signal diff decoded and inverted should give original signal
 
 		self.connect(self, self.gmsk_sync)

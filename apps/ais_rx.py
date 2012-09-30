@@ -6,20 +6,17 @@
 #something else to do: brute-force error correction, a la gr-air.
 #another thing to do: use a Viterbi algorithm for detecting the demodulated data
 
-from gnuradio import gr, gru, blks2, optfir
-from gnuradio import eng_notation
-from gr_ais import *
-from gr_ais.ais_demod import *
+from gnuradio import gr, filter
 from gnuradio import uhd
 from gnuradio import digital
-#from ais_parser import *
-from optparse import OptionParser
 from gnuradio.eng_option import eng_option
+import gnuradio.gr.gr_threading as _threading
+from gr_ais import *
+from gr_ais.ais_demod import *
+from optparse import OptionParser
 
-#from pkt import *
 import time
 import sys
-import gnuradio.gr.gr_threading as _threading
 import socket
 
 class top_block_runner(_threading.Thread):
@@ -80,7 +77,7 @@ class my_top_block(gr.top_block):
 		self.u = src
 		self.coeffs = gr.firdes.low_pass(1,self.rate,7000,1000)
 		self._filter_decimation = 4
-		self.filter = gr.freq_xlating_fir_filter_ccf(self._filter_decimation, 
+		self.filter = filter.freq_xlating_fir_filter_ccf(self._filter_decimation, 
 													 self.coeffs, 
 													 freq,
 													 self.rate)
@@ -98,8 +95,8 @@ class my_top_block(gr.top_block):
 		options.samp_rate = self.rate / self._filter_decimation
 		self.demod = ais_demod(options) #ais_demod.py, hierarchical demodulation block, takes in complex baseband and spits out 1-bit packed bitstream
 		self.unstuff = ais.unstuff() #ais_unstuff.cc, unstuffs data
-		self.start_correlator = gr.correlate_access_code_tag_bb("1010101010101010", 0, "ais_preamble") #should mark start of packet
-		self.stop_correlator = gr.correlate_access_code_tag_bb("01111110", 0, "ais_frame") #should mark start and end of packet
+		self.start_correlator = digital.correlate_access_code_tag_bb("1010101010101010", 0, "ais_preamble") #should mark start of packet
+		self.stop_correlator = digital.correlate_access_code_tag_bb("01111110", 0, "ais_frame") #should mark start and end of packet
 		self.parse = ais.parse(queue, designator) #ais_parse.cc, calculates CRC, parses data into ASCII message, moves data onto queue
 
 		self.connect(self.u,
