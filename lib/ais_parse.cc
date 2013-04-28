@@ -167,14 +167,13 @@ void ais_parse::parse_data(char *data, int len)
 
 void ais_parse::decode_ais(char *ascii, int len)
 {
-
     // check report type
     unsigned long value;
 
     value = ascii_to_ais(*ascii);
     if(value > 27) {
         if(VERBOSE2)
-            printf("Unknown AIS report type: %d", value);
+            printf("Unknown AIS report type: %d\n", value);
 
         return;
     }
@@ -243,66 +242,13 @@ void ais_parse::decode_ais(char *ascii, int len)
     case 1:
     case 2:
     case 3:
-        decode_position_123A(data+6, len, str);
-        break;
+        decode_position_123A(data+6, len, str); break;
 
     case 4: decode_base_station(data+6, len, str); break;
 
-    //default: { // nop }
-    }
-
-#if 0
-
-    // Navigation Status bit 38-41 len 4
-    value = data[6] & 0x0f;
-    error = false;
-
-    switch(value) {
-    case  0: strcpy(str, "Navigation Status: Under way using engine\n"); break;
-    case  1: strcpy(str, "Navigation Status: At anchor\n"); break;
-    case  2: strcpy(str, "Navigation Status: Not under command\n"); break;
-    case  3: strcpy(str, "Navigation Status: Restricted manoeuverability\n"); break;
-    case  4: strcpy(str, "Navigation Status: Constrained by her draught\n"); break;
-    case  5: strcpy(str, "Navigation Status: Moored\n"); break;
-    case  6: strcpy(str, "Navigation Status: Aground\n"); break;
-    case  7: strcpy(str, "Navigation Status: Engaged in Fishing\n"); break;
-    case  8: strcpy(str, "Navigation Status: Under way sailing\n"); break;
-
-    // skip reserved 9-4 and undefined 15
     default:
-        error = true;
+        break;
     }
-
-    if(!error)
-        d_payload << str;
-
-    // Rate of Turn (ROT) 42-49 8 bit
-    value = data[7] << 2 | ((data[8] >> 4) & 0x03);
-    i = (signed char) value;
-    //printf("Rate of Turn: %d (%d)\n", (signed char) value, value);
-
-    error = false;
-    if(i == 0)
-        strcpy(str, "Rate of Turn: Not turning\n");
-    else if(i == 127)
-        strcpy(str, "Rate of Turn: Right at more than 5 deg per 30 s\n");
-    else if(i == -127)
-        strcpy(str, "Rate of Turn: Left at more than 5 deg per 30 s\n");
-    else if(abs(i) == 128)
-        error = true;
-    else {
-        d_value = pow(((double) i) / 4.733, 2);
-        sprintf(str, "Rate of Turn: %s at %.3f deg/s\n", i > 0 ? "Right":"Left", d_value);
-    }
-
-    if(!error)
-        d_payload << str;
-
-    // Speed Over Ground (SOG) 50-59 10 bit
-    value = (data[8] & 0x0f) << 6 | data[9];
-    sprintf(str, "Speed Over Ground: %.1f knots (%d)\n", (double) value / 10.0, value);
-    d_payload << str;
-#endif
 
     d_payload << std::endl;
 
@@ -311,13 +257,12 @@ void ais_parse::decode_ais(char *ascii, int len)
 
     gr_message_sptr msg = gr_make_message_from_string(std::string(d_payload.str()));
     d_queue->handle(msg);
-
 }
 
 void ais_parse::decode_position_123A(unsigned char *ais, int len, char *str)
 {
     if((len*6) != 168) {
-        sprintf(str, "Erroneous report size %d bit, it should be 168 bit", len*6);
+        sprintf(str, "Erroneous report size %d bit, it should be 168 bit\n", len*6);
         d_payload << str;
 
         return;
@@ -437,7 +382,7 @@ void ais_parse::decode_position_123A(unsigned char *ais, int len, char *str)
 void ais_parse::decode_base_station(unsigned char *ais, int len, char *str)
 {
     if((len*6) != 168) {
-        sprintf(str, "Erroneous report size %d bit, it should be 168 bit", len*6);
+        sprintf(str, "Erroneous report size %d bit, it should be 168 bit\n", len*6);
         d_payload << str;
 
         return;
