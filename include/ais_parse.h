@@ -46,8 +46,8 @@ private:
     friend ais_parse_sptr ais_make_parse(gr_msg_queue_sptr queue, char designator);
     ais_parse(gr_msg_queue_sptr queue, char designator);
 
-    std::ostringstream d_payload; //message output
-    gr_msg_queue_sptr d_queue;		  // Destination for decoded messages
+    std::ostringstream d_payload; // message output
+    gr_msg_queue_sptr d_queue;	  // Destination for decoded messages
 
     char d_designator;
 
@@ -61,8 +61,17 @@ private:
     unsigned long unpack(char *buffer, int start, int length);
     char nmea_checksum(std::string buffer);
     
+    // decoder
+    double d_qth_lon; // your current longitude -180 (West) -> 180 (East)
+    double d_qth_lat; // your current latitude -90 (South) -> 90 (North)
+
     void decode_ais(char *ascii, int len);
     void decode_base_station(unsigned char *ais, int len, char *str);
+    void decode_position_123A(unsigned char *ais, int len, char *str);
+
+    // decoder utils
+    double wgs84distance(double lon1, double lat1, double lon2, double lat2);
+    double wgs84bearing(double lon1, double lat1, double lon2, double lat2);
 
     inline unsigned char ascii_to_ais(char ascii)
     {

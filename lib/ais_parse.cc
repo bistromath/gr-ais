@@ -38,6 +38,10 @@
 #define VERBOSE  0
 #define VERBOSE2 1
 
+const double DTR = M_PI / 180.0;
+const double RTD = 180.0 / M_PI;
+
+
 GR_AIS_API ais_parse_sptr ais_make_parse(gr_msg_queue_sptr queue, char designator)
 {
     return ais_parse_sptr(new ais_parse(queue, designator));
@@ -53,6 +57,12 @@ ais_parse::ais_parse(gr_msg_queue_sptr queue, char designator) :
     d_num_stoplost = 0;
     d_num_startlost = 0;
     d_num_found = 0;
+
+    // decoder stuff
+    d_qth_lon = 21.5593;
+    d_qth_lat = 63.1587;
+
+
     set_output_multiple(1000);
 }
 
@@ -147,14 +157,19 @@ void ais_parse::parse_data(char *data, int len)
     decode_ais(asciidata, len/6);
 }
 
+/**
+
+    http://www.navcen.uscg.gov/?pageName=AISmain
+    http://gpsd.berlios.de/AIVDM.html#_types_1_2_and_3_position_report_class_a
+    http://rl.se/aivdm
+
+**/
+
 void ais_parse::decode_ais(char *ascii, int len)
 {
-    // http://gpsd.berlios.de/AIVDM.html#_types_1_2_and_3_position_report_class_a
-    // http://rl.se/aivdm
 
     // check report type
     unsigned long value;
-    int report_type;
 
     value = ascii_to_ais(*ascii);
     if(value > 27) {
@@ -168,9 +183,8 @@ void ais_parse::decode_ais(char *ascii, int len)
 
     unsigned char *data = (unsigned char *) malloc(len * sizeof(unsigned char));
     char *str = (char *) malloc(1024 * sizeof(char));
+    int report_type;
     bool error;
-
-    double d_value;
     int i;
 
     for(i=0; i<len; i++) {
@@ -226,6 +240,12 @@ void ais_parse::decode_ais(char *ascii, int len)
     d_payload << str;
 
     switch(report_type) {
+    case 1:
+    case 2:
+    case 3:
+        decode_position_123A(data+6, len, str);
+        break;
+
     case 4: decode_base_station(data+6, len, str); break;
 
     //default: { // nop }
@@ -294,17 +314,159 @@ void ais_parse::decode_ais(char *ascii, int len)
 
 }
 
+void ais_parse::decode_position_123A(unsigned char *ais, int len, char *str)
+{
+    if((len*6) != 168) {
+        sprintf(str, "Erroneous report size %d bit, it should be 168 bit", len*6);
+        d_payload << str;
+
+        return;
+    }
+
+    unsigned long value;
+    double d, lon, lat;
+    bool error;
+    int i;
+
+    // Navigation Status bit 38-41 len 4
+    value = ais[0] & 0x0f;
+    error = false;
+
+    switch(value) {
+    case  0: strcpy(str, "Navigation Status: Under way using engine\n"); break;
+    case  1: strcpy(str, "Navigation Status: At anchor\n"); break;
+    case  2: strcpy(str, "Navigation Status: Not under command\n"); break;
+    case  3: strcpy(str, "Navigation Status: Restricted manoeuverability\n"); break;
+    case  4: strcpy(str, "Navigation Status: Constrained by her draught\n"); break;
+    case  5: strcpy(str, "Navigation Status: Moored\n"); break;
+    case  6: strcpy(str, "Navigation Status: Aground\n"); break;
+    case  7: strcpy(str, "Navigation Status: Engaged in Fishing\n"); break;
+    case  8: strcpy(str, "Navigation Status: Under way sailing\n"); break;
+
+    // skip reserved 9-4 and undefined 15
+    default:
+        error = true;
+    }
+
+    if(!error)
+        d_payload << str;
+
+    // Rate of Turn (ROT) 42-49 8 bit
+    value = ais[1] << 2 | ((ais[2] >> 4) & 0x03);
+    i = (signed char) value;
+    //printf("Rate of Turn: %d (%d)\n", (signed char) value, value);
+
+    error = false;
+    if(i == 127)
+        strcpy(str, "Rate of Turn: Right at more than 5 deg per 30 s\n");
+    else if(i == -127)
+        strcpy(str, "Rate of Turn: Left at more than 5 deg per 30 s\n");
+    else if(abs(i) == 128 || i == 0)
+        error = true;
+    else {
+        d = pow(((double) i) / 4.733, 2);
+        sprintf(str, "Rate of Turn: %s at %.3f deg/s\n", i > 0 ? "Right":"Left", d);
+    }
+
+    if(!error)
+        d_payload << str;
+
+    // Speed Over Ground (SOG) 50-59 10 bit
+    value = (ais[2] & 0x0f) << 6 | ais[3];
+    sprintf(str, "Speed Over Ground: %.1f knots\n", (double) value / 10.0);
+    d_payload << str;
+
+    // skip Position Accuracy 1 bit
+    // lon 61-88 28 bit
+    //       5                     6              6              6                 5
+    value = (ais[4] & 0x1f) << 23 | ais[5] << 17 | ais[6] << 11 | ais[7] << 5 | (ais[8] & 0x3e) >> 1; // 1 bit
+    lon = ((double) value) / 600000.0;
+
+    // lat 107-133 27 bit
+    //       1                     6               6               6               6                  2
+    value = (ais[8] & 0x01) << 26 | ais[9] << 20 | ais[10] << 14 | ais[11] << 8 | ais[12] << 2 | (ais[13] & 0x30) >> 4; // 4 bit
+    lat = ((double) value) / 600000.0;
+
+    if(lon >= -180 && lon <= 180 && lat >= -90 && lat <= 90) {
+        sprintf(str, "Longitude: %.6f %s\n", fabs(lon), lon < 0 ? "West":"East");
+        d_payload << str;
+
+        sprintf(str, "Latitude: %.6f %s\n", fabs(lat), lat < 0 ? "South":"North");
+        d_payload << str;
+
+        d = wgs84distance(d_qth_lon, d_qth_lat, lon, lat);
+
+        sprintf(str, "Distance to station: %.3f M (%.0f m)\n", d / 1851.85, d);
+        d_payload << str;
+
+        d = wgs84bearing(d_qth_lon, d_qth_lat, lon, lat);
+        sprintf(str, "Bearing to station: %.1f deg\n", d);
+        d_payload << str;
+    }
+
+    // Course Over Ground (COG) 116-127 12 bit
+    value = (ais[13] & 0x0f) << 8 | ais[14] << 2 | (ais[15] & 0x30) >> 4; // 4 bit
+    if(value != 3600) {
+        d = ((double) value) / 10.0;
+        sprintf(str, "Course Over Ground: %.1f deg\n", d);
+        d_payload << str;
+    }
+
+    // True Heading (HDG) 128-136 9 bit
+    value = (ais[15] & 0x0f) << 5 | (ais[16] & 0x3e) >> 1; // 1 bit
+    if(value >= 0 && value < 360) {
+        sprintf(str, "True Heading: %d deg\n", value);
+        d_payload << str;
+    }
+
+    // timestamp 137-142 6 bit
+    value = (ais[16] & 0x01) << 5 | (ais[17] & 0x1f) >> 1; // 1 bit
+
+    // Maneuver Indicator 143-144 2 bit
+    value = ((ais[17] & 0x01) << 1 | (ais[18] & 0x20) >> 5) & 0x03; // 5 bit
+    if(value) {
+        if(value == 1)
+            sprintf(str, "Maneuver Indicator: No special maneuver\n");
+        else
+            sprintf(str, "Maneuver Indicator: Special maneuver (such as regional passing arrangement)\n");
+
+        d_payload << str;
+    }
+}
+
 void ais_parse::decode_base_station(unsigned char *ais, int len, char *str)
 {
     if((len*6) != 168) {
-        if(VERBOSE2)
-            printf("Erroneous report size %d bit, it should be 168 bit", len*6);
+        sprintf(str, "Erroneous report size %d bit, it should be 168 bit", len*6);
+        d_payload << str;
 
         return;
     }
 
     unsigned int v1, v2, v3, v4;
-    double d;
+    double d, lon, lat;
+    bool error;
+
+    // Type of EPFD 134-137 4 bit
+    v1 = ais[16] & 0x0f;
+    error = false;
+
+    switch(v1) {
+    case 1: strcpy(str, "Station electronic position fixing device: GPS\n"); break;
+    case 2: strcpy(str, "Station electronic position fixing device: GLONASS\n"); break;
+    case 3: strcpy(str, "Station electronic position fixing device: Combined GPS/GLONASS\n"); break;
+    case 4: strcpy(str, "Station electronic position fixing device: Loran-C\n"); break;
+    case 5: strcpy(str, "Station electronic position fixing device: Chayka\n"); break;
+    case 6: strcpy(str, "Station electronic position fixing device: Integrated navigation system\n"); break;
+    case 7: strcpy(str, "Station electronic position fixing device: Surveyed\n"); break;
+    case 8: strcpy(str, "Station electronic position fixing device: Galileo\n"); break;
+
+    default:
+        error = true;
+    }
+
+    if(!error)
+        d_payload << str;
 
     // utc year 38-51 14 bit
     v1 = (ais[0] & 0x0f) << 10 | ais[1] << 4 | (ais[2] & 0x3c) >> 2;
@@ -323,18 +485,181 @@ void ais_parse::decode_base_station(unsigned char *ais, int len, char *str)
     // lon 79-106 28 bit
     //       5                     6              6              6                 5
     v1 = (ais[7] & 0x1f) << 23 | ais[8] << 17 | ais[9] << 11 | ais[10] << 5 | (ais[11] & 0x3e) >> 1; // 1 bit
-    d = ((double) v1) / 600000.0;
-    sprintf(str, "Longitude: %.6f %s\n", fabs(d), d < 0 ? "West":"East");
-    d_payload << str;
+    lon = ((double) v1) / 600000.0;
 
     // lat 107-133 27 bit
     //       1                     6               6               6               6                  2
     v1 = (ais[11] & 0x01) << 26 | ais[12] << 20 | ais[13] << 14 | ais[14] << 8 | ais[15] << 2 | (ais[16] & 0x30) >> 4; // 4 bit
-    d = ((double) v1) / 600000.0;
-    sprintf(str, "Latitude: %.6f %s\n", fabs(d), d < 0 ? "South":"North");
-    d_payload << str;
+    lat = ((double) v1) / 600000.0;
 
+    if(lon >= -180 && lon <= 180 && lat >= -90 && lat <= 90) {
+        sprintf(str, "Longitude: %.6f %s\n", fabs(lon), lon < 0 ? "West":"East");
+        d_payload << str;
+
+        sprintf(str, "Latitude: %.6f %s\n", fabs(lat), lat < 0 ? "South":"North");
+        d_payload << str;
+
+        d = wgs84distance(d_qth_lon, d_qth_lat, lon, lat);
+
+        sprintf(str, "Distance to station: %.3f M (%.0f m)\n", d / 1851.85, d);
+        d_payload << str;
+
+        d = wgs84bearing(d_qth_lon, d_qth_lat, lon, lat);
+        sprintf(str, "Bearing to station: %.1f deg\n", d);
+        d_payload << str;
+    }
+
+    if(ais[20] == 0 && ais[21] != 0) {
+        sprintf(str, "%d Vessels in range\n", ais[21]);
+        d_payload << str;
+    }
 }
+
+double ais_parse::wgs84distance(double lon1, double lat1, double lon2, double lat2)
+{
+    if(lon1 == lon2 && lat1 == lat2)
+        return 0;
+
+    double dLon, U1, U2, sinU1, cosU1, sinU2, cosU2;
+    double lam, lamPrev, sinLam, cosLam, cos2sigM;
+    double sinSig, cosSig, sig, sinAlpha, cosAlpha2;
+    double C, Cb2, u2, A, B, dsig;
+    double ea, eb, ef;
+    int i;
+
+    // WGS84 ellipsoid
+    ea = 6378137.0;
+    eb = 6356752.314245;
+    ef = 1.0 / 298.257223563;
+
+    dLon = (lon2 - lon1) * DTR;
+
+    U1 = atan((1.0 - ef) * tan(lat1 * DTR));
+    U2 = atan((1.0 - ef) * tan(lat2 * DTR));
+    sinU1 = sin(U1);
+    cosU1 = cos(U1);
+    sinU2 = sin(U2);
+    cosU2 = cos(U2);
+
+    lam = dLon;
+    i = 0;
+
+    while((i++ == 0 || fabs(lam - lamPrev) > 1e-12) && i < 20)
+    {
+        lamPrev = lam;
+        sinLam = sin(lam);
+        cosLam = cos(lam);
+
+        sinSig = sqrt(pow(cosU2 * sinLam, 2.0) + pow(cosU1 * sinU2 - sinU1 * cosU2 * cosLam, 2.0));
+        if(sinSig == 0.0)
+            return 0; // co-incident points
+        cosSig = sinU1 * sinU2 + cosU1 * cosU2 * cosLam;
+        sig = atan2(sinSig, cosSig);
+        sinAlpha = cosU1 * cosU2 * sinLam / sinSig;
+        cosAlpha2 = 1.0 - pow(sinAlpha, 2.0);
+
+        if(cosAlpha2 == 0.0)
+            cos2sigM = 0;
+        else
+            cos2sigM = cosSig - 2.0 * sinU1 * sinU2 / cosAlpha2;
+
+        C = ef / 16.0 * cosAlpha2 * (4.0 + ef * (4.0 - 3.0 * cosAlpha2));
+
+        lam = dLon + (1.0 - C) * ef * sinAlpha * (sig + C * sinSig * (cos2sigM + C * cosSig * (-1.0 + 2.0 * pow(cos2sigM, 2.0))));
+    }
+
+    Cb2 = pow(eb, 2.0);
+    u2 = cosAlpha2 * (pow(ea, 2.0) - Cb2) / Cb2;
+    A = 1.0 + u2 / 16384.0 * (4096.0 + u2 * (-768.0 + u2 * (320.0 - 175.0 * u2)));
+    B = u2 / 1024.0 * (256.0 + u2 * (-128.0 + u2 * (74.0 - 47.0 * u2)));
+    dsig = B * sinSig * (cos2sigM + 0.25 * B * (cosSig * (-1.0 + 2.0 * pow(cos2sigM, 2.0)) -
+           1.0 / 6.0 * B * cos2sigM * (-3.0 + 4.0 * pow(sinSig, 2.0)) * (-3.0 + 4.0 * pow(cos2sigM, 2.0))));
+
+    return (eb * A * (sig - dsig)); // meter
+}
+
+double ais_parse::wgs84bearing(double lon1, double lat1, double lon2, double lat2)
+{
+    if(lon1 == lon2 && lat1 == lat2)
+        return 0;
+
+    double dLon, U1, U2, sinU1, cosU1, sinU2, cosU2;
+    double lam, lamPrev, sinLam, cosLam, cos2sigM;
+    double sinSig, cosSig, sig, sinAlpha, cosAlpha2;
+    double C, Cb2, u2, A, B, dsig, ef;
+    int i;
+
+    // WGS84 ellipsoid
+    ef = 1.0 / 298.257223563;
+
+    dLon = (lon2 - lon1) * DTR;
+
+    U1 = atan((1.0 - ef) * tan(lat1 * DTR));
+    U2 = atan((1.0 - ef) * tan(lat2 * DTR));
+    sinU1 = sin(U1);
+    cosU1 = cos(U1);
+    sinU2 = sin(U2);
+    cosU2 = cos(U2);
+
+    lam = dLon;
+    i = 0;
+
+    while((i++ == 0 || fabs(lam - lamPrev) > 1e-12) && i < 20)
+    {
+        lamPrev = lam;
+        sinLam = sin(lam);
+        cosLam = cos(lam);
+
+        sinSig = sqrt(pow(cosU2 * sinLam, 2.0) + pow(cosU1 * sinU2 - sinU1 * cosU2 * cosLam, 2.0));
+        if(sinSig == 0.0)
+            return 0; // co-incident points
+        cosSig = sinU1 * sinU2 + cosU1 * cosU2 * cosLam;
+        sig = atan2(sinSig, cosSig);
+        sinAlpha = cosU1 * cosU2 * sinLam / sinSig;
+        cosAlpha2 = 1.0 - pow(sinAlpha, 2.0);
+
+        if(cosAlpha2 == 0.0)
+            cos2sigM = 0;
+        else
+            cos2sigM = cosSig - 2.0 * sinU1 * sinU2 / cosAlpha2;
+
+        C = ef / 16.0 * cosAlpha2 * (4.0 + ef * (4.0 - 3.0 * cosAlpha2));
+
+        lam = dLon + (1.0 - C) * ef * sinAlpha * (sig + C * sinSig * (cos2sigM + C * cosSig * (-1.0 + 2.0 * pow(cos2sigM, 2.0))));
+    }
+
+#if 0
+
+    // from lon2, lat2 -> lon1, lat1 (target <- you)
+    double az1 = (atan2(cosU2 * sinLam, cosU2 * sinU2 - sinU1 * cosU2 * cosLam)) * RTD;
+
+    /*
+    while(az1 < 0)
+        az1 += 360.0;
+
+    while(az1 > 360)
+        az1 -= 360.0;
+        */
+
+    printf("\naz1: %f\n", az1);
+
+#endif
+
+    // you -> target
+    double az2 = (atan2(cosU1 * sinLam, -sinU1 * cosU2 + cosU1 * sinU2 * cosLam)) * RTD;
+
+    while(az2 < 0)
+        az2 += 360.0;
+
+    while(az2 > 360)
+        az2 -= 360.0;
+
+    //printf("az2: %f\n", az2);
+
+    return az2;
+}
+
+
 
 unsigned long ais_parse::unpack(char *buffer, int start, int length)
 {
