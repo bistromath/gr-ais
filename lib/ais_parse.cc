@@ -31,8 +31,12 @@
 #include <boost/foreach.hpp>
 #include <gr_tags.h>
 #include <gr_ais_api.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
 
-#define VERBOSE 0
+#define VERBOSE  0
+#define VERBOSE2 1
 
 GR_AIS_API ais_parse_sptr ais_make_parse(gr_msg_queue_sptr queue, char designator)
 {
@@ -100,19 +104,29 @@ void ais_parse::parse_data(char *data, int len)
     d_payload.str("");
 
     char asciidata[255]; //168/6 bits per ascii char
+
     reverse_bit_order(data, len); //the AIS standard has bits come in backwards for some inexplicable reason
+
     if(crc(data, len)) {
-	if(VERBOSE) std::cout << "Failed CRC!" << std::endl;
-	return; //don't make a message if crc fails
+        if(VERBOSE)
+           std::cout << "Failed CRC!" << std::endl;
+
+        return; //don't make a message if crc fails
     }
 
     len -= 16; //strip off CRC
 
     for(int i = 0; i < len/6; i++) {
-	asciidata[i] = unpack(data, i*6, 6);
-	if(asciidata[i] > 39) asciidata[i] += 8;
-	asciidata[i] += 48;
+        asciidata[i] = unpack(data, i*6, 6);
+
+        //printf("%02x ", asciidata[i]);
+
+        if(asciidata[i] > 39)
+            asciidata[i] += 8;
+        asciidata[i] += 48;
     }
+
+    //printf("\n");
 
     //hey just a note, NMEA sentences are limited to 82 characters. the 448-bit long AIS messages end up longer than 82 encoded chars.
     //so technically, the below is not valid as it does not split long sentences for you. the upside is that ESR's GPSD (recommended for this use)
@@ -129,6 +143,197 @@ void ais_parse::parse_data(char *data, int len)
     //ptooie
     gr_message_sptr msg = gr_make_message_from_string(std::string(d_payload.str()));
     d_queue->handle(msg);
+
+    decode_ais(asciidata, len/6);
+}
+
+void ais_parse::decode_ais(char *ascii, int len)
+{
+    // http://gpsd.berlios.de/AIVDM.html#_types_1_2_and_3_position_report_class_a
+    // http://rl.se/aivdm
+
+    // check report type
+    unsigned long value;
+    int report_type;
+
+    value = ascii_to_ais(*ascii);
+    if(value > 27) {
+        if(VERBOSE2)
+            printf("Unknown AIS report type: %d", value);
+
+        return;
+    }
+
+    d_payload.str("");
+
+    unsigned char *data = (unsigned char *) malloc(len * sizeof(unsigned char));
+    char *str = (char *) malloc(1024 * sizeof(char));
+    bool error;
+
+    double d_value;
+    int i;
+
+    for(i=0; i<len; i++) {
+        data[i] = ascii_to_ais(ascii[i]);
+        if(VERBOSE2) {
+            printf("%02x ", data[i]);
+            if(i == (len-1))
+                printf("\n");
+        }
+    }
+
+    // message type bit 0-5 len 6 bit
+    report_type = *data;
+
+    switch(report_type) {
+    case  1: d_payload << "Position Report Class A\n"; break;
+    case  2: d_payload << "Position Report Class A (Assigned schedule)\n"; break;
+    case  3: d_payload << "Position Report Class A (Response to interrogation)\n"; break;
+    case  4: d_payload << "Base Station Report\n"; break;
+    case  5: d_payload << "Static and Voyage Related Data\n"; break;
+    case  6: d_payload << "Binary Addressed Message\n"; break;
+    case  7: d_payload << "Binary Acknowledge\n"; break;
+    case  8: d_payload << "Binary Broadcast Message\n"; break;
+    case  9: d_payload << "Standard SAR Aircraft Position Report\n"; break;
+    case 10: d_payload << "UTC and Date Inquiry\n"; break;
+    case 11: d_payload << "UTC and Date Response\n"; break;
+    case 12: d_payload << "Addressed Safety Related Message\n"; break;
+    case 13: d_payload << "Safety Related Acknowledgement\n"; break;
+    case 14: d_payload << "Safety Related Broadcast Message\n"; break;
+    case 15: d_payload << "Interrogation\n"; break;
+    case 16: d_payload << "Assignment Mode Command\n"; break;
+    case 17: d_payload << "DGNSS Binary Broadcast Message\n"; break;
+    case 18: d_payload << "Standard Class B CS Position Report\n"; break;
+    case 19: d_payload << "Extended Class B Equipment Position Report\n"; break;
+    case 20: d_payload << "Data Link Management\n"; break;
+    case 21: d_payload << "Aid-to-Navigation Report\n"; break;
+    case 22: d_payload << "Channel Management\n"; break;
+    case 23: d_payload << "Group Assignment Command\n"; break;
+    case 24: d_payload << "Static Data Report\n"; break;
+    case 25: d_payload << "Single Slot Binary Message\n"; break;
+    case 26: d_payload << "Multiple Slot Binary Message With Communications State\n"; break;
+    case 27: d_payload << "Position Report For Long-Range Applications\n"; break;
+
+    default:
+        d_payload << "Unknown report type " << report_type << "\n";
+    }
+
+    // skip repeat indicator bit 6-7 len 2
+
+    // Mobile Marine Service Identifier bit 8-37 len 30
+    value = (data[1] & 0x0f) << 26 | data[2] << 20 | data[3] << 14 | data[4] << 8 | data[5] << 2 | ((data[6] >> 4) & 0x03);
+    sprintf(str, "Mobile Marine Service Identifier: %d\n", value);
+    d_payload << str;
+
+    switch(report_type) {
+    case 4: decode_base_station(data+6, len, str); break;
+
+    //default: { // nop }
+    }
+
+#if 0
+
+    // Navigation Status bit 38-41 len 4
+    value = data[6] & 0x0f;
+    error = false;
+
+    switch(value) {
+    case  0: strcpy(str, "Navigation Status: Under way using engine\n"); break;
+    case  1: strcpy(str, "Navigation Status: At anchor\n"); break;
+    case  2: strcpy(str, "Navigation Status: Not under command\n"); break;
+    case  3: strcpy(str, "Navigation Status: Restricted manoeuverability\n"); break;
+    case  4: strcpy(str, "Navigation Status: Constrained by her draught\n"); break;
+    case  5: strcpy(str, "Navigation Status: Moored\n"); break;
+    case  6: strcpy(str, "Navigation Status: Aground\n"); break;
+    case  7: strcpy(str, "Navigation Status: Engaged in Fishing\n"); break;
+    case  8: strcpy(str, "Navigation Status: Under way sailing\n"); break;
+
+    // skip reserved 9-4 and undefined 15
+    default:
+        error = true;
+    }
+
+    if(!error)
+        d_payload << str;
+
+    // Rate of Turn (ROT) 42-49 8 bit
+    value = data[7] << 2 | ((data[8] >> 4) & 0x03);
+    i = (signed char) value;
+    //printf("Rate of Turn: %d (%d)\n", (signed char) value, value);
+
+    error = false;
+    if(i == 0)
+        strcpy(str, "Rate of Turn: Not turning\n");
+    else if(i == 127)
+        strcpy(str, "Rate of Turn: Right at more than 5 deg per 30 s\n");
+    else if(i == -127)
+        strcpy(str, "Rate of Turn: Left at more than 5 deg per 30 s\n");
+    else if(abs(i) == 128)
+        error = true;
+    else {
+        d_value = pow(((double) i) / 4.733, 2);
+        sprintf(str, "Rate of Turn: %s at %.3f deg/s\n", i > 0 ? "Right":"Left", d_value);
+    }
+
+    if(!error)
+        d_payload << str;
+
+    // Speed Over Ground (SOG) 50-59 10 bit
+    value = (data[8] & 0x0f) << 6 | data[9];
+    sprintf(str, "Speed Over Ground: %.1f knots (%d)\n", (double) value / 10.0, value);
+    d_payload << str;
+#endif
+
+    d_payload << std::endl;
+
+    free(data);
+    free(str);
+
+    gr_message_sptr msg = gr_make_message_from_string(std::string(d_payload.str()));
+    d_queue->handle(msg);
+
+}
+
+void ais_parse::decode_base_station(unsigned char *ais, int len, char *str)
+{
+    if((len*6) != 168) {
+        if(VERBOSE2)
+            printf("Erroneous report size %d bit, it should be 168 bit", len*6);
+
+        return;
+    }
+
+    unsigned int v1, v2, v3, v4;
+    double d;
+
+    // utc year 38-51 14 bit
+    v1 = (ais[0] & 0x0f) << 10 | ais[1] << 4 | (ais[2] & 0x3c) >> 2;
+    // utc month 52-55 4 bit
+    v2 = ((ais[2] & 0x03) << 2 | ais[3] & 0x30);
+    // utc day 56-60 5 bit
+    v3 = ((ais[3] & 0x0f) << 1 | (ais[4] & 0x10) >> 5);
+    // utc hour 61-65 5 bit
+    v4 = ais[4] & 0x1f;
+    // utc minute 66-71 6 bit
+    // utc second 72-77 6 bit
+    sprintf(str, "%d-%02d-%02d %02d:%02d:%02d UTC\n", v1, v2, v3, v4, ais[5], ais[6]);
+    d_payload << str;
+
+    // skip fix 1 bit
+    // lon 79-106 28 bit
+    //       5                     6              6              6                 5
+    v1 = (ais[7] & 0x1f) << 23 | ais[8] << 17 | ais[9] << 11 | ais[10] << 5 | (ais[11] & 0x3e) >> 1; // 1 bit
+    d = ((double) v1) / 600000.0;
+    sprintf(str, "Longitude: %.6f %s\n", fabs(d), d < 0 ? "West":"East");
+    d_payload << str;
+
+    // lat 107-133 27 bit
+    //       1                     6               6               6               6                  2
+    v1 = (ais[11] & 0x01) << 26 | ais[12] << 20 | ais[13] << 14 | ais[14] << 8 | ais[15] << 2 | (ais[16] & 0x30) >> 4; // 4 bit
+    d = ((double) v1) / 600000.0;
+    sprintf(str, "Latitude: %.6f %s\n", fabs(d), d < 0 ? "South":"North");
+    d_payload << str;
+
 }
 
 unsigned long ais_parse::unpack(char *buffer, int start, int length)

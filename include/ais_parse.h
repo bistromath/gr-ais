@@ -61,6 +61,20 @@ private:
     unsigned long unpack(char *buffer, int start, int length);
     char nmea_checksum(std::string buffer);
     
+    void decode_ais(char *ascii, int len);
+    void decode_base_station(unsigned char *ais, int len, char *str);
+
+    inline unsigned char ascii_to_ais(char ascii)
+    {
+        unsigned char ais = ascii - 48;
+
+        if(ais > 40)
+            ais -= 8;
+
+        return (ais & 0x3f);
+    }
+
+
 public:
     int work(int noutput_items,
         gr_vector_const_void_star &input_items, 
