@@ -239,7 +239,12 @@ void ais_parse::decode_ais(char *ascii, int len)
     case 27: d_payload << "Position Report For Long-Range Applications\n"; break;
 
     default:
+    {
+        free(data);
+        free(str);
+
         return;
+    }
     }
 
     // skip repeat indicator bit 6-7 len 2
