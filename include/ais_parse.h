@@ -30,7 +30,7 @@
 class ais_parse;
 typedef boost::shared_ptr<ais_parse> ais_parse_sptr;
 
-ais_parse_sptr ais_make_parse(gr_msg_queue_sptr queue, char designator);
+ais_parse_sptr ais_make_parse(gr_msg_queue_sptr queue, char designator, int verbose, double lon, double lat);
 
 /*!
  * \brief ais packetizer/parser
@@ -39,17 +39,28 @@ ais_parse_sptr ais_make_parse(gr_msg_queue_sptr queue, char designator);
 
 #define FIELD_DELIM ((unsigned char)128)
 
+                       // level 0, output ascii only
+#define V_DECODE     1 // level 1, output ascii and decode packet
+#define V_DEBUG_2    2 // level 2, output ascii, decode packet and debug less
+#define V_DEBUG_3    4 // level 3, decode broken packets, debug more
+#define V_DEBUG_4    8 // level 4, debug even more
+#define V_DEBUG_5   16 // level 5,
+#define V_DEBUG_6   32 // level 6,
+
+#define V_MAX_LEVEL 0x00ff
+
 class ais_parse : public gr_sync_block
 {
 private:
     // Constructors
-    friend ais_parse_sptr ais_make_parse(gr_msg_queue_sptr queue, char designator);
-    ais_parse(gr_msg_queue_sptr queue, char designator);
+    friend ais_parse_sptr ais_make_parse(gr_msg_queue_sptr queue, char designator, int verbose, double lon, double lat);
+    ais_parse(gr_msg_queue_sptr queue, char designator, int verbose, double lon, double lat);
 
     std::ostringstream d_payload; // message output
     gr_msg_queue_sptr d_queue;	  // Destination for decoded messages
 
     char d_designator;
+    unsigned long d_verbose;
 
     int d_num_stoplost;
     int d_num_startlost;
@@ -58,20 +69,27 @@ private:
     void parse_data(char *data, int len);
     void reverse_bit_order(char *data, int length);
     unsigned short crc(char *buffer, unsigned int len);
+    unsigned char packet_crc(const char *buffer);
     unsigned long unpack(char *buffer, int start, int length);
     char nmea_checksum(std::string buffer);
     
-    // decoder
     double d_qth_lon; // your current longitude -180 (West) -> 180 (East)
     double d_qth_lat; // your current latitude -90 (South) -> 90 (North)
 
     void decode_ais(char *ascii, int len);
     void decode_base_station(unsigned char *ais, int len, char *str);
     void decode_position_123A(unsigned char *ais, int len, char *str);
+    void decode_static_and_voyage_data(unsigned char *ais, int len, char *str);
+    void decode_sar_aircraft_position(unsigned char *ais, int len, char *str);
 
     // decoder utils
+    void print_position(unsigned char *ais, char *str, const char *obj_type);
+    void print_course_over_ground(unsigned char *ais, char *str);
+
+    void get_lonlat(unsigned char *ais, double *lon, double *lat);
     double wgs84distance(double lon1, double lat1, double lon2, double lat2);
     double wgs84bearing(double lon1, double lat1, double lon2, double lat2);
+    void toDMS(double ll, int *d, int *m, double *s);
 
     inline unsigned char ascii_to_ais(char ascii)
     {

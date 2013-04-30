@@ -41,12 +41,12 @@ public:
 
 GR_SWIG_BLOCK_MAGIC(ais,parse);
 
-ais_parse_sptr ais_make_parse(gr_msg_queue_sptr queue, char designator);
+ais_parse_sptr ais_make_parse(gr_msg_queue_sptr queue, char designator, int verbose, double lon, double lat);
 
 class ais_parse : public gr_sync_block
 {
 private:
-	ais_parse(gr_msg_queue_sptr queue, char designator);
+    ais_parse(gr_msg_queue_sptr queue, char designator, int verbose, double lon, double lat);
 
 public:
 };

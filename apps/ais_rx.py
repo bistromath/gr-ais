@@ -94,13 +94,18 @@ class my_top_block(gr.top_block):
 		options.mu=0.5
 		options.omega_relative_limit = 0.0001
 		options.bits_per_sec = self._bits_per_sec
-		options.fftlen = 4096 #trades off accuracy of freq estimation in presence of noise, vs. delay time.
+                #trades off accuracy of freq estimation in presence of noise, vs. delay time.
+                options.fftlen = 4096
 		options.samp_rate = self.rate / self._filter_decimation
-		self.demod = ais_demod(options) #ais_demod.py, hierarchical demodulation block, takes in complex baseband and spits out 1-bit packed bitstream
+                #ais_demod.py, hierarchical demodulation block, takes in complex baseband and spits out 1-bit packed bitstream
+                self.demod = ais_demod(options)
 		self.unstuff = ais.unstuff() #ais_unstuff.cc, unstuffs data
-		self.start_correlator = gr.correlate_access_code_tag_bb("1010101010101010", 0, "ais_preamble") #should mark start of packet
-		self.stop_correlator = gr.correlate_access_code_tag_bb("01111110", 0, "ais_frame") #should mark start and end of packet
-		self.parse = ais.parse(queue, designator) #ais_parse.cc, calculates CRC, parses data into ASCII message, moves data onto queue
+                #should mark start of packet
+                self.start_correlator = gr.correlate_access_code_tag_bb("1010101010101010", 0, "ais_preamble")
+                #should mark start and end of packet
+                self.stop_correlator = gr.correlate_access_code_tag_bb("01111110", 0, "ais_frame")
+                #ais_parse.cc, calculates CRC, parses data into ASCII message, moves data onto queue
+                self.parse = ais.parse(queue, designator, options.verbose, options.lon, options.lat)
 
 		self.connect(self.u,
 		             self.filter,
@@ -136,6 +141,12 @@ def main():
 						help="Use optional coherent demodulation and Viterbi decoder")
 	parser.add_option("-t", "--tcp", action="store_true", default=False,
 						help="Start a TCP server on port 9987 instead of outputting to stdout. Useful for gpsd.")
+        parser.add_option("-V", "--verbose", type="int", default=1,
+                                                help="Verbosity level. 0=AIS ascii output only, 1=decode packets, >1 various debug levels [default=%default]")
+        parser.add_option("", "--lon", type="float", default=21.5593,
+                                                help="Your longitude [default=%default]")
+        parser.add_option("", "--lat", type="float", default=63.1587,
+                                                help="Your latitude [default=%default]")
 
 	(options, args) = parser.parse_args ()
 
