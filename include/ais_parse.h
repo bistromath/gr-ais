@@ -89,6 +89,8 @@ private:
     void decode_dgnss_broadcast_bin_msg(unsigned char *ais, int len, char *str);
     void decode_class_b_position_report(unsigned char *ais, int len, char *str, bool extended);
     void decode_aid_to_navigation(unsigned char *ais, int len, char *str);
+    void decode_static_data_msg(unsigned char *ais, int len, char *str);
+    void decode_long_range_msg(unsigned char *ais, int len, char *str);
 
 
 
@@ -101,6 +103,9 @@ private:
     void print_ais_payload_hex(unsigned char *ais, int bit_pos, int len, const char *data_desc);
     void print_raim(unsigned char *ais, int bit_pos, char *str);
     void print_ship_properties(unsigned char *ais, int bit_pos, char *str);
+    void print_ship_dimension(unsigned char *ais, int bit_pos, char *str);
+    void print_ship_type(unsigned char *ais, int bit_pos, char *str);
+    void print_navigation_status(unsigned char *ais, int bit_pos, char *str);
 
     char   *get_ais_text(unsigned char *ais, int bit_pos, int len6, char *buf);
     void   get_lonlat(unsigned char *ais, int bit_pos, double *lon, double *lat);
