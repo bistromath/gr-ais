@@ -39,6 +39,18 @@ const char   *DEG_SIGN = "\xc2\xb0";
 const double DTR = M_PI / 180.0;
 const double RTD = 180.0 / M_PI;
 
+static const char ais_ascii_table[64] =
+{
+    '@', 'A', 'B', 'C', 'D', 'E', 'F', 'G',
+    'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
+    'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W',
+    'X', 'Y', 'Z', '[', '\\', ']', '^', '_',
+    ' ', '!', '"', '#', '$', '%', '&', '\'',
+    '(', ')', '*', '+', ',', '-', '.', '/',
+    '0', '1', '2', '3', '4', '5', '6', '7',
+    '8', '9', ':', ';', '<', '=', '>', '?'
+};
+
 
 GR_AIS_API ais_parse_sptr ais_make_parse(gr_msg_queue_sptr queue, char designator, int verbose, double lon, double lat)
 {
@@ -66,9 +78,9 @@ ais_parse::ais_parse(gr_msg_queue_sptr queue, char designator, int verbose, doub
         d_verbose |= 1 << i;
 
     if(d_verbose & V_DEBUG_5) {
-        std::cout << "verbose level " << d_verbose << std::endl;
-        std::cout << "latitude: " << d_qth_lat << std::endl;
-        std::cout << "longitude: " << d_qth_lon << std::endl;
+        std::cout << "verbose level " << verbose << " debug level " << d_verbose << std::endl;
+        std::cout << "your latitude: " << d_qth_lat << std::endl;
+        std::cout << "your longitude: " << d_qth_lon << std::endl;
     }
 
     set_output_multiple(1000);
@@ -88,71 +100,78 @@ int ais_parse::work(int noutput_items,
     std::vector<gr_tag_t> preamble_tags, start_tags, end_tags;
     uint64_t abs_sample_cnt = nitems_read(0);
     get_tags_in_range(preamble_tags, 0, abs_sample_cnt, abs_sample_cnt + size, pmt::pmt_string_to_symbol("ais_preamble"));
-    if(preamble_tags.size() == 0) return size; //sad trombone
+    if(preamble_tags.size() == 0)
+        return size; //sad trombone
     
     //look for start & end tags within a reasonable range
     uint64_t preamble_mark = preamble_tags[0].offset;
-    if(d_verbose & V_DEBUG_5) std::cout << "Found a preamble at " << preamble_mark << std::endl;
+    if(d_verbose & V_DEBUG_6)
+        std::cout << d_designator << " Found a preamble at " << preamble_mark << std::endl;
     
     //now look for a start tag within reasonable range of the preamble
     get_tags_in_range(start_tags, 0, preamble_mark, preamble_mark + 30, pmt::pmt_string_to_symbol("ais_frame"));
-    if(start_tags.size() == 0) return preamble_mark + 30 - abs_sample_cnt; //nothing here, move on (should update d_num_startlost)
+    if(start_tags.size() == 0)
+        return (preamble_mark + 30 - abs_sample_cnt); //nothing here, move on (should update d_num_startlost)
+
     uint64_t start_mark = start_tags[0].offset;
-    if(d_verbose & V_DEBUG_5) std::cout << "Found a start tag at " << start_mark << std::endl;
+    if(d_verbose & V_DEBUG_5)
+        std::cout << d_designator << " Found a start tag at " << start_mark << std::endl;
     
     //now look for an end tag within reasonable range of the preamble
     get_tags_in_range(end_tags, 0, start_mark + 184, start_mark + 450, pmt::pmt_string_to_symbol("ais_frame"));
-    if(end_tags.size() == 0) return preamble_mark + 450 - abs_sample_cnt; //should update d_num_stoplost
+    if(end_tags.size() == 0)
+        return (preamble_mark + 450 - abs_sample_cnt); //should update d_num_stoplost
+
     uint64_t end_mark = end_tags[0].offset;
-    if(d_verbose & V_DEBUG_5) std::cout << "Found an end tag at " << end_mark << std::endl;
+    if(d_verbose & V_DEBUG_5)
+        std::cout << d_designator << " Found an end tag at " << end_mark << std::endl;
 
     //now we've got a valid, framed packet
     uint64_t datalen = end_mark - start_mark - 8; //includes CRC, discounts end of frame marker
-    if(d_verbose & V_DEBUG_4) std::cout << "Found packet with length " << datalen << std::endl;
+    if(d_verbose & V_DEBUG_4)
+        std::cout << d_designator << " Found packet with length (- CRC) " << (datalen - 16) << "\n" << std::endl;
+
     char *pkt = new char[datalen];
 
     memcpy(pkt, &in[start_mark-abs_sample_cnt], datalen);
     parse_data(pkt, datalen);
+
     delete(pkt);
-    return end_mark - abs_sample_cnt;
+
+    return (end_mark - abs_sample_cnt);
 }
 
 void ais_parse::parse_data(char *data, int len)
 {
     d_payload.str("");
 
-    char asciidata[255]; //168/6 bits per ascii char
+    char asciidata[255]; // 6 bits per ascii char (168/6 = 28 chars (bytes))
 
     reverse_bit_order(data, len); //the AIS standard has bits come in backwards for some inexplicable reason
 
     bool crc_chk = true;
     if(crc(data, len)) {
-        if((d_verbose & V_DEBUG_2) && !(d_verbose & V_DEBUG_3))
-           std::cout << "Failed CRC!" << std::endl;
-
         crc_chk = false;
 
-        if(!(d_verbose & V_DEBUG_3))
+        if(!(d_verbose & V_DEBUG_2))
             return; //don't make a message if crc fails
     }
 
     len -= 16; //strip off CRC
-    for(int i = 0; i < len/6; i++) {
-        asciidata[i] = unpack(data, i*6, 6);
-        if(asciidata[i] > 39)
-            asciidata[i] += 8;
-        asciidata[i] += 48;
-    }
+    int len6 = len / 6;
 
-    //printf("\n");
+    for(int i = 0; i < len6; i++)
+        asciidata[i] = data_to_ascii(unpack(data, i*6, 6));
 
-    //hey just a note, NMEA sentences are limited to 82 characters. the 448-bit long AIS messages end up longer than 82 encoded chars.
-    //so technically, the below is not valid as it does not split long sentences for you. the upside is that ESR's GPSD (recommended for this use)
-    //ignores this length restriction and parses them anyway. but this might bite you if you use this program with other parsers.
-    //you should probably write something to split the sentences here. shouldn't be hard at all.
-    //if(debug) d_payload << "BAD PACKET: ";
+    // hey just a note, NMEA sentences are limited to 82 characters. the 448-bit long AIS messages end up longer than 82 encoded chars.
+    // so technically, the below is not valid as it does not split long sentences for you. the upside is that ESR's GPSD (recommended for this use)
+    // ignores this length restriction and parses them anyway. but this might bite you if you use this program with other parsers.
+    // you should probably write something to split the sentences here. shouldn't be hard at all.
+
     d_payload << "!AIVDM,1,1,," << d_designator << ",";
-    for(int i = 0; i < len/6; i++) d_payload << asciidata[i];
+    for(int i = 0; i < len6; i++)
+        d_payload << asciidata[i];
+
     d_payload << ",0"; //number of bits to fill out 6-bit boundary
 
     char checksum = nmea_checksum(std::string(d_payload.str()));
@@ -165,8 +184,13 @@ void ais_parse::parse_data(char *data, int len)
     gr_message_sptr msg = gr_make_message_from_string(std::string(d_payload.str()));
     d_queue->handle(msg);
 
+
+    // try to decode broken packet if verbose level > 2
+    if(!crc_chk && !(d_verbose & V_DEBUG_3))
+       return;
+
     if(d_verbose & V_DECODE)
-        decode_ais(asciidata, len/6);
+        decode_ais(asciidata, len6, crc_chk);
 }
 
 /**
@@ -177,7 +201,7 @@ void ais_parse::parse_data(char *data, int len)
 
 **/
 
-void ais_parse::decode_ais(char *ascii, int len)
+void ais_parse::decode_ais(char *ascii, int len, bool crc_ok)
 {
     unsigned long value;
 
@@ -188,23 +212,32 @@ void ais_parse::decode_ais(char *ascii, int len)
         if(d_verbose & V_DEBUG_2)
             printf("Unknown AIS report type: %d\n", value);
 
-        if(!(d_verbose & V_DEBUG_3))
-            return;
+        return;
     }
 
-    unsigned char *data = (unsigned char *) malloc(len * sizeof(unsigned char));
+    unsigned char *data;
+    int i;
+
+    // allocate enough so it wont segfault when debugging
+    i = (d_verbose & V_DEBUG_2) ? 512:len;
+    data = (unsigned char *) malloc(i * sizeof(unsigned char));
+    memset(data, 0, i * sizeof(unsigned char));
+
     char *str = (char *) malloc(1024 * sizeof(char));
     int report_type;
-    int i;
 
     for(i=0; i<len; i++) {
         data[i] = ascii_to_ais(ascii[i]);
+
         if(d_verbose & V_DEBUG_4) {
             printf("%02x ", data[i]);
             if(i == (len-1))
-                printf("\n");
+                printf("<- %s\n", crc_ok ? "CRC OK!":"CRC Failed!");
         }
     }
+
+    if(d_verbose & V_DECODE)
+        d_payload << std::string(d_designator == 'A' ? "AIS A @ 161.975 MHz\n":"AIS B @ 162.025 MHz\n");
 
     // message type bit 0-5 len 6 bit
     report_type = *data;
@@ -237,37 +270,25 @@ void ais_parse::decode_ais(char *ascii, int len)
     case 25: d_payload << "Single Slot Binary Message\n"; break;
     case 26: d_payload << "Multiple Slot Binary Message With Communications State\n"; break;
     case 27: d_payload << "Position Report For Long-Range Applications\n"; break;
-
-    default:
-    {
-        free(data);
-        free(str);
-
-        return;
-    }
     }
 
-    // skip repeat indicator bit 6-7 len 2
-
-    // Mobile Marine Service Identifier bit 8-37 len 30
-    value = (data[1] & 0x0f) << 26 | data[2] << 20 | data[3] << 14 | data[4] << 8 | data[5] << 2 | ((data[6] >> 4) & 0x03);
+    value = ais_value(data, 8, 30);
     sprintf(str, "Mobile Marine Service Identifier: %d\n", value);
     d_payload << str;
 
     switch(report_type) {
     case 1:
     case 2:
-    case 3: decode_position_123A(data+6, len, str); break;
-    case 4: decode_base_station(data+6, len, str); break;
-    case 5: decode_static_and_voyage_data(data+6, len, str); break;
+    case 3: decode_position_123A(data, len, str); break;
+    case 4: decode_base_station(data, len, str); break;
+    case 5: decode_static_and_voyage_data(data, len, str); break;
 
-    case 9: decode_sar_aircraft_position(data+6, len, str); break;
+   // case 9: decode_sar_aircraft_position(data+6, len, str); break;
 
     default:
         break;
     }
 
-    d_payload << std::endl;
 
     free(data);
     free(str);
@@ -314,16 +335,16 @@ void ais_parse::decode_sar_aircraft_position(unsigned char *ais, int len, char *
     }
 
     // lon lat 61-88, 89-115 28+27 bit
-    print_position(ais + 4, str, "aircraft");
-
+    //print_position(ais + 4, str, "aircraft");
     // Course Over Ground 116-127 12 bit
-    print_course_over_ground(ais + 13, str);
+    print_course_over_ground(ais, 116, str);
 
 }
 
 void ais_parse::decode_static_and_voyage_data(unsigned char *ais, int len, char *str)
 {
-    if((len*6) != 424) {
+    // 424/6 = 70.6667
+    if((len*6) != 420) {
         if(d_verbose & V_DEBUG_2)
             printf("Erroneous report size %d bit, it should be 424 bit\n", len*6);
 
@@ -331,27 +352,119 @@ void ais_parse::decode_static_and_voyage_data(unsigned char *ais, int len, char 
             return;
     }
 
-    unsigned int v1, v2, v3;
-    double d, lon, lat;
+    unsigned int v1;
     bool error;
-    int i;
 
-    // AIS version bit 38-39 len 2
-    v1 = (ais[0] & 0x0c) >> 2;
-    sprintf(str, "AIS version: %d\n", v1);
+    sprintf(str, "AIS version: %d\n", ais_value(ais, 38, 2) & 0x03);
     d_payload << str;
 
-    // IMO Number 40-69 30 bit
-    //           2                 6              6              6              6                   4
-    v1 = (ais[0] & 0x03) << 28 | ais[1] << 22 | ais[2] << 16 | ais[3] << 10 | ais[4] << 4 | (ais[5] & 0x3c) >> 2; // 2bit
-    sprintf(str, "IMO Number: %d\n", v1);
+    sprintf(str, "IMO Number: %d\n", ais_value(ais, 40, 30));
     d_payload << str;
 
+    d_payload << "Call Sign: " << get_ais_text(ais, 70, 7, str) << "\n";
+    d_payload << "Vessel Name: " << get_ais_text(ais, 112, 20, str) << "\n";
 
-    //  todo
+//    return;
 
-
+    // Vessel Name 112-231 120 bit text
     error = false;
+
+    v1 = ais_value(ais, 232, 8);
+    switch(v1) {
+    case 20: strcpy(str, "Wing in ground (WIG)\n"); break;
+    case 21:
+    case 22:
+    case 23:
+    case 24: sprintf(str, "Wing in ground (WIG). Hazardous category %c (%d)\n", 68 - (24 - v1), v1); break;
+    case 30: strcpy(str, "Fishing\n"); break;
+    case 31: strcpy(str, "Towing\n"); break;
+    case 32: strcpy(str, "Towing: length exceeds 200m or breadth exceeds 25m\n"); break;
+    case 33: strcpy(str, "Dredging or underwater ops\n"); break;
+    case 34: strcpy(str, "Diving ops\n"); break;
+    case 35: strcpy(str, "Military ops\n"); break;
+    case 36: strcpy(str, "Sailing\n"); break;
+    case 37: strcpy(str, "Pleasure Craft\n"); break;
+    case 40: strcpy(str, "High speed craft (HSC)\n"); break;
+    case 41:
+    case 42:
+    case 43:
+    case 44: sprintf(str, "High speed craft (HSC). Hazardous category %c (%d)\n", 68 - (44 - v1), v1); break;
+    case 49: strcpy(str, "High speed craft (HSC)\n"); break;
+    case 50: strcpy(str, "Pilot vessel\n"); break;
+    case 51: strcpy(str, "Search and Rescue vessel\n"); break;
+    case 52: strcpy(str, "Tug\n"); break;
+    case 53: strcpy(str, "Port Tender\n"); break;
+    case 54: strcpy(str, "Anti-pollution equipment\n"); break;
+    case 55: strcpy(str, "Law Enforcement\n"); break;
+    case 58: strcpy(str, "Medical Transport\n"); break;
+    case 59: strcpy(str, "Noncombatant ship according to RR Resolution No. 18\n"); break;
+    case 60: strcpy(str, "Passenger\n"); break;
+    case 61:
+    case 62:
+    case 63:
+    case 64: sprintf(str, "Passenger. Hazardous category %c (%d)\n", 68 - (64 - v1), v1); break;
+    case 69: strcpy(str, "Passenger\n"); break;
+    case 70: strcpy(str, "Cargo\n"); break;
+    case 71:
+    case 72:
+    case 73:
+    case 74: sprintf(str, "Cargo. Hazardous category %c (%d)\n", 68 - (74 - v1), v1); break;
+    case 79: strcpy(str, "Cargo\n"); break;
+    case 80: strcpy(str, "Tanker\n"); break;
+    case 81:
+    case 82:
+    case 83:
+    case 84: sprintf(str, "Tanker. Hazardous category %c (%d)\n", 68 - (84 - v1), v1); break;
+    case 89: strcpy(str, "Tanker\n"); break;
+    case 90: strcpy(str, "Other Type\n"); break;
+    case 91:
+    case 92:
+    case 93:
+    case 94: sprintf(str, "Other Type. Hazardous category %c (%d)\n", 68 - (84 - v1), v1); break;
+    case 99: strcpy(str, "Other Type\n"); break;
+
+    default:
+        error = true;
+    }
+
+    if(!error)
+        d_payload << "Ship Type: " << str;
+
+    v1 = ais_value(ais, 240, 9);
+    if(v1) {
+        sprintf(str, "Dimension to Bow: %d m%s", v1, v1 == 511 ? " or greater\n":"\n");
+        d_payload << str;
+    }
+    v1 = ais_value(ais, 249, 9);
+    if(v1) {
+        sprintf(str, "Dimension to Stern: %d m%s", v1, v1 == 511 ? " or greater\n":"\n");
+        d_payload << str;
+    }
+    v1 = ais_value(ais, 258, 6);
+    if(v1) {
+        sprintf(str, "Dimension to Port: %d m%s", v1, v1 == 63 ? " or greater\n":"\n");
+        d_payload << str;
+    }
+    v1 = ais_value(ais, 264, 6);
+    if(v1) {
+        sprintf(str, "Dimension to Starboard: %d m%s", v1, v1 == 63 ? " or greater\n":"\n");
+        d_payload << str;
+    }
+
+    sprintf(str, "Draught: %.1f m\n", ((double) ais_value(ais, 294, 8)) / 10.0);
+    d_payload << str;
+
+    print_position_fix_type(ais, 270, str);
+
+    d_payload << "Destination: " << get_ais_text(ais, 302, 20, str) << "\n";
+
+    v1 = ais_value(ais, 274, 4);
+    if(v1) {
+        sprintf(str, "Estimated Time of Arrival %02d-%02d %02d:%02d UTC\n",
+                v1, ais_value(ais, 278, 5),
+                ais_value(ais, 283, 5), ais_value(ais, 288, 6));
+        d_payload << str;
+    }
 }
 
 void ais_parse::decode_position_123A(unsigned char *ais, int len, char *str)
@@ -370,7 +483,7 @@ void ais_parse::decode_position_123A(unsigned char *ais, int len, char *str)
     int i;
 
     // Navigation Status bit 38-41 len 4
-    value = ais[0] & 0x0f;
+    value = ais_value(ais, 38, 4); //ais[6] & 0x0f;
     error = false;
 
     switch(value) {
@@ -384,7 +497,7 @@ void ais_parse::decode_position_123A(unsigned char *ais, int len, char *str)
     case  7: strcpy(str, "Navigation Status: Engaged in Fishing\n"); break;
     case  8: strcpy(str, "Navigation Status: Under way sailing\n"); break;
 
-    // skip reserved 9-4 and undefined 15
+    // skip reserved 9-14 and undefined 15
     default:
         error = true;
     }
@@ -392,57 +505,35 @@ void ais_parse::decode_position_123A(unsigned char *ais, int len, char *str)
     if(!error)
         d_payload << str;
 
-    // Rate of Turn (ROT) 42-49 8 bit
-    value = ais[1] << 2 | ((ais[2] >> 4) & 0x03);
+    value = ais_value(ais, 42, 8);
     i = (signed char) value;
 
     error = false;
     if(i < -127 || i > 127 || i == 0)
         error = true;
     if(i == 127)
-        strcpy(str, "Rate of Turn: Right at more than 5 deg per 30 s\n");
+        sprintf(str, "Rate of Turn: Right at more than 5%s per 30 sec\n", DEG_SIGN);
     else if(i == -127)
-        strcpy(str, "Rate of Turn: Left at more than 5 deg per 30 s\n");
+        sprintf(str, "Rate of Turn: Left at more than 5%s per 30 sec\n", DEG_SIGN);
     else {
         d = pow(((double) i) / 4.733, 2);
-        sprintf(str, "Rate of Turn: %s at %.3f%s/m\n", i > 0 ? "Right":"Left", d, DEG_SIGN);
+        sprintf(str, "Rate of Turn: %s at %.3f%s/min\n", i > 0 ? "Right":"Left", d, DEG_SIGN);
     }
 
     if(!error)
         d_payload << str;
 
-    // Speed Over Ground (SOG) 50-59 10 bit
-    value = (ais[2] & 0x0f) << 6 | ais[3];
-    sprintf(str, "Speed Over Ground: %.1f knots\n", (double) value / 10.0);
-    d_payload << str;
+    print_speed_over_ground(ais, 50, str, true);
+    print_position(ais, 61, str, "vessel");
+    print_course_over_ground(ais, 116, str);
 
-    // lon 61-88 28 bit, lat 107-133 27 bit
-    print_position(ais + 4, str, "vessel");
-
-    // Course Over Ground (COG) 116-127 12 bit
-    print_course_over_ground(ais + 13, str);
-
-    /*
-    value = (ais[13] & 0x0f) << 8 | ais[14] << 2 | (ais[15] & 0x30) >> 4; // 4 bit
-    if(value != 3600) {
-        d = ((double) value) / 10.0;
-        sprintf(str, "Course Over Ground: %.1f%s\n", d, DEG_SIGN);
-        d_payload << str;
-    }
-    */
-
-    // True Heading (HDG) 128-136 9 bit
-    value = (ais[15] & 0x0f) << 5 | (ais[16] & 0x3e) >> 1; // 1 bit
+    value = ais_value(ais, 128, 9);
     if(value >= 0 && value < 360) {
         sprintf(str, "True Heading: %d%s\n", value, DEG_SIGN);
         d_payload << str;
     }
 
-    // timestamp 137-142 6 bit
-    value = (ais[16] & 0x01) << 5 | (ais[17] & 0x1f) >> 1; // 1 bit
-
-    // Maneuver Indicator 143-144 2 bit
-    value = ((ais[17] & 0x01) << 1 | (ais[18] & 0x20) >> 5) & 0x03; // 5 bit
+    value = ais_value(ais, 143, 2);
     if(value) {
         if(value == 1)
             sprintf(str, "Maneuver Indicator: No special maneuver\n");
@@ -464,57 +555,50 @@ void ais_parse::decode_base_station(unsigned char *ais, int len, char *str)
     }
 
     unsigned int v1, v2, v3, v4;
-    bool error;
 
-    // Type of EPFD 134-137 4 bit
-    v1 = ais[16] & 0x0f;
-    error = false;
+    print_position_fix_type(ais, 134, str);
 
-    switch(v1) {
-    case 1: strcpy(str, "Station electronic position fixing device: GPS\n"); break;
-    case 2: strcpy(str, "Station electronic position fixing device: GLONASS\n"); break;
-    case 3: strcpy(str, "Station electronic position fixing device: Combined GPS/GLONASS\n"); break;
-    case 4: strcpy(str, "Station electronic position fixing device: Loran-C\n"); break;
-    case 5: strcpy(str, "Station electronic position fixing device: Chayka\n"); break;
-    case 6: strcpy(str, "Station electronic position fixing device: Integrated navigation system\n"); break;
-    case 7: strcpy(str, "Station electronic position fixing device: Surveyed\n"); break;
-    case 8: strcpy(str, "Station electronic position fixing device: Galileo\n"); break;
+    // UTC timestamp
+    v1 = ais_value(ais, 38, 14);
+    v2 = ais_value(ais, 52, 4);
+    v3 = ais_value(ais, 56, 5);
+    v4 = ais_value(ais, 61, 5);
 
-    default:
-        error = true;
-    }
-
-    if(!error)
-        d_payload << str;
-
-    // utc year 38-51 14 bit
-    v1 = (ais[0] & 0x0f) << 10 | ais[1] << 4 | (ais[2] & 0x3c) >> 2;
-    // utc month 52-55 4 bit
-    v2 = ((ais[2] & 0x03) << 2 | ais[3] & 0x30);
-    // utc day 56-60 5 bit
-    v3 = ((ais[3] & 0x0f) << 1 | (ais[4] & 0x10) >> 5);
-    // utc hour 61-65 5 bit
-    v4 = ais[4] & 0x1f;
-    // utc minute 66-71 6 bit
-    // utc second 72-77 6 bit
-    sprintf(str, "%d-%02d-%02d %02d:%02d:%02d UTC\n", v1, v2, v3, v4, ais[5], ais[6]);
+    sprintf(str, "%d-%02d-%02d %02d:%02d:%02d UTC\n", v1, v2, v3, v4, ais[11], ais[12]);
     d_payload << str;
 
     // lon 79-106 28 bit, lat 107-133 27 bit
-    print_position(ais + 7, str, "station");
+    print_position(ais, 79, str, "station");
 
-    if(ais[20] == 0 && ais[21] != 0) {
-        sprintf(str, "%d vessels in range\n", ais[21]);
+    if(ais[26] == 0 && ais[27] != 0) {
+        sprintf(str, "%d vessels in range\n", ais[27]);
         d_payload << str;
     }
 }
 
-void ais_parse::print_course_over_ground(unsigned char *ais, char *str)
+
+void ais_parse::print_speed_over_ground(unsigned char *ais, int bit_pos, char *str, bool ship)
+{
+    int value = ais_value(ais, bit_pos, 10);
+    double speed = ship ? (((double) value) / 10.0):value;
+
+    if(value == 1023)
+        return;
+    else if(value == 1022)
+        sprintf(str, "Speed Over Ground: %.*f knots or more\n", ship ? 1:0, speed);
+    else
+        sprintf(str, "Speed Over Ground: %.*f knots\n", ship ? 1:0, speed);
+
+    d_payload << str;
+}
+
+void ais_parse::print_course_over_ground(unsigned char *ais, int bit_pos, char *str)
 {
     unsigned int value;
     double d;
 
     value = (ais[0] & 0x0f) << 8 | ais[1] << 2 | (ais[2] & 0x30) >> 4; // 4 bit
+    value = ais_value(ais, bit_pos, 12);
 
     if(value != 3600) {
         d = ((double) value) / 10.0;
@@ -523,26 +607,24 @@ void ais_parse::print_course_over_ground(unsigned char *ais, char *str)
     }
 }
 
-void ais_parse::get_lonlat(unsigned char *ais, double *lon, double *lat)
+void ais_parse::get_lonlat(unsigned char *ais, int bit_pos, double *lon, double *lat)
 {
     unsigned int v;
 
     // lon 28 bit
-    //       5                     6              6              6                5
-    v = (ais[0] & 0x1f) << 23 | ais[1] << 17 | ais[2] << 11 | ais[3] << 5 | (ais[4] & 0x3e) >> 1; // 1 bit
+    v = ais_value(ais, bit_pos, 28);
     *lon = ((double) v) / 600000.0;
 
     // lat 27 bit
-    //       1                     6               6               6             6               2
-    v = (ais[4] & 0x01) << 26 | ais[5] << 20 | ais[6] << 14 | ais[7] << 8 | ais[8] << 2 | (ais[9] & 0x30) >> 4; // 4 bit
+    v = ais_value(ais, bit_pos + 28, 27);
     *lat = ((double) v) / 600000.0;
 }
 
-void ais_parse::print_position(unsigned char *ais, char *str, const char *obj_type)
+void ais_parse::print_position(unsigned char *ais, int bit_pos, char *str, const char *obj_type)
 {
     double lon, lat;
 
-    get_lonlat(ais, &lon, &lat);
+    get_lonlat(ais, bit_pos, &lon, &lat);
 
     if(lon < -180 || lon > 180 || lat < -90 || lat > 90) {
         if(d_verbose & V_DEBUG_2)
@@ -591,6 +673,90 @@ void ais_parse::toDMS(double ll, int *d, int *m, double *s)
     dm = fabs(ll - *d) * 60.0;
     *m = (int) dm;
     *s = fabs(dm - *m) * 60.0;
+}
+
+void ais_parse::print_position_fix_type(unsigned char *ais, int bit_pos, char *str)
+{
+    // Type of EPFD 134-137 4 bit
+    int type = ais_value(ais, bit_pos, 4);
+    bool error = false;
+
+    switch(type) {
+    case 1: strcpy(str, "Station Electronic Position Fixing Device: GPS\n"); break;
+    case 2: strcpy(str, "Station Electronic Position Fixing Device: GLONASS\n"); break;
+    case 3: strcpy(str, "Station Electronic Position Fixing Device: Combined GPS/GLONASS\n"); break;
+    case 4: strcpy(str, "Station Electronic Position Fixing Device: Loran-C\n"); break;
+    case 5: strcpy(str, "Station Electronic Position Fixing Device: Chayka\n"); break;
+    case 6: strcpy(str, "Station Electronic Position Fixing Device: Integrated navigation system\n"); break;
+    case 7: strcpy(str, "Station Electronic Position Fixing Device: Surveyed\n"); break;
+    case 8: strcpy(str, "Station Electronic Position Fixing Device: Galileo\n"); break;
+
+    default:
+        error = true;
+    }
+
+    if(!error)
+        d_payload << str;
+}
+
+unsigned long ais_parse::ais_value(unsigned char *ais, int bit_pos, int len)
+{
+    unsigned long rc;
+    unsigned char c;
+    int i;
+
+    int byte = bit_pos / 6;
+    int bits = bit_pos % 6;
+
+    c = 0;
+    for(i=(6 - bits); i<6; i++)
+        c |= 1 << i;
+
+    len -= (6 - bits);
+    rc = (ais[byte] & (c ^ 0x3f)) << len;
+
+    if(len == 0)
+        return rc;
+
+    byte += 1;
+    while(len >= 6) {
+        rc |= ais[byte++] << (len - 6);
+        len -= 6;
+    }
+
+    if(len == 0)
+        return rc;
+
+    bits = 6 - len;
+    c = 0;
+    for(i=0; i<bits; i++)
+        c |= 1 << i;
+
+    rc |= (ais[byte] & (c ^ 0x3f)) >> bits;
+
+    return rc;
+}
+
+char *ais_parse::get_ais_text(unsigned char *ais, int bit_pos, int len6, char *buf)
+{
+    unsigned char v;
+    char ch, prev_ch = 'a';
+    int i;
+
+    for(i=0; i<len6; i++) {
+        v = ais_value(ais, bit_pos + i*6, 6);
+        ch = ais_ascii_table[v & 0x3f];
+
+        if((prev_ch == 32 && ch == 32) || (prev_ch == '@' && ch == '@'))
+            break;
+
+        buf[i] = ch;
+        prev_ch = ch;
+    }
+
+    buf[i > 0 ? (i-1):0] = '\0';
+
+    return buf;
 }
 
 double ais_parse::wgs84distance(double lon1, double lat1, double lon2, double lat2)
@@ -708,7 +874,7 @@ double ais_parse::wgs84bearing(double lon1, double lat1, double lon2, double lat
 
     // from lon2, lat2 -> lon1, lat1 (target <- you)
     double az1 = (atan2(cosU2 * sinLam, cosU2 * sinU2 - sinU1 * cosU2 * cosLam)) * RTD;
-    if(d_verbose & V_DEBUG_5)
+    if(d_verbose & V_DEBUG_6)
         printf("\naz1: %f\n", az1);
 
     while(az1 < 0)
@@ -719,7 +885,7 @@ double ais_parse::wgs84bearing(double lon1, double lat1, double lon2, double lat
 
     // you -> target
     double az2 = (atan2(cosU1 * sinLam, -sinU1 * cosU2 + cosU1 * sinU2 * cosLam)) * RTD;
-    if(d_verbose & V_DEBUG_5)
+    if(d_verbose & V_DEBUG_6)
         printf("az2: %f\n", az2);
 
     while(az2 < 0)
@@ -737,9 +903,10 @@ unsigned long ais_parse::unpack(char *buffer, int start, int length)
 {
     unsigned long ret = 0;
     for(int i = start; i < (start+length); i++) {
-	ret <<= 1;
-	ret |= (buffer[i] & 0x01);
+        ret <<= 1;
+        ret |= (buffer[i] & 0x01);
     }
+
     return ret;
 }
 

@@ -76,20 +76,36 @@ private:
     double d_qth_lon; // your current longitude -180 (West) -> 180 (East)
     double d_qth_lat; // your current latitude -90 (South) -> 90 (North)
 
-    void decode_ais(char *ascii, int len);
+    void decode_ais(char *ascii, int len, bool crc_ok);
     void decode_base_station(unsigned char *ais, int len, char *str);
     void decode_position_123A(unsigned char *ais, int len, char *str);
     void decode_static_and_voyage_data(unsigned char *ais, int len, char *str);
     void decode_sar_aircraft_position(unsigned char *ais, int len, char *str);
 
     // decoder utils
-    void print_position(unsigned char *ais, char *str, const char *obj_type);
-    void print_course_over_ground(unsigned char *ais, char *str);
+    void print_position(unsigned char *ais, int bit_pos, char *str, const char *obj_type);
+    void print_course_over_ground(unsigned char *ais, int bit_pos, char *str);
+    void print_speed_over_ground(unsigned char *ais, int bit_pos, char *str, bool ship);
+    void print_position_fix_type(unsigned char *ais, int bit_pos, char *str);
 
-    void get_lonlat(unsigned char *ais, double *lon, double *lat);
+    char *get_ais_text(unsigned char *ais, int bit_pos, int len6, char *buf);
+    void get_lonlat(unsigned char *ais, int bit_pos, double *lon, double *lat);
     double wgs84distance(double lon1, double lat1, double lon2, double lat2);
-    double wgs84bearing(double lon1, double lat1, double lon2, double lat2);
+    double wgs84bearing(double lon1, double lat1, double lon2, double lat2);        
     void toDMS(double ll, int *d, int *m, double *s);
+
+    unsigned long ais_value(unsigned char *ais, int bit_pos, int len);
+    inline char data_to_ascii(unsigned long unpacked)
+    {
+        char ch = unpacked;
+
+        if(ch > 39)
+            ch += 8;
+
+        ch += 48;
+
+        return ch;
+    }
 
     inline unsigned char ascii_to_ais(char ascii)
     {

@@ -61,6 +61,9 @@ class my_top_block(gr.top_block):
 				options.gain = (g.start()+g.stop()) / 2.0
 
 			#print "Setting gain to %i" % options.gain
+                        #g = self.u.get_gain_range()
+			#print "Max gain %i" % g.stop()
+			#print "Min gain %i" % g.start()
 			self.u.set_gain(options.gain)
 
 
