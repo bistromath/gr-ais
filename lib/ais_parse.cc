@@ -219,11 +219,10 @@ void ais_parse::decode_ais(char *ascii, int len, bool crc_ok)
     int i;
 
     // allocate enough so it wont segfault when debugging
-    i = (d_verbose & V_DEBUG_2) ? 512:len;
+    i = (d_verbose & V_DEBUG_2) ? 256:len;
     data = (unsigned char *) malloc(i * sizeof(unsigned char));
-    memset(data, 0, i * sizeof(unsigned char));
 
-    char *str = (char *) malloc(1024 * sizeof(char));
+    char *str = (char *) malloc(512 * sizeof(char));
     int report_type;
 
     for(i=0; i<len; i++) {
@@ -236,10 +235,11 @@ void ais_parse::decode_ais(char *ascii, int len, bool crc_ok)
         }
     }
 
-    if(d_verbose & V_DECODE)
-        d_payload << std::string(d_designator == 'A' ? "AIS A @ 161.975 MHz\n":"AIS B @ 162.025 MHz\n");
+    sprintf(str, "AIS VHF maritime channel %dB (%.3f MHz)\n",
+            d_designator == 'A' ? 87:88,
+            d_designator == 'A' ? 161.975:162.025);
+    d_payload << str;
 
-    // message type bit 0-5 len 6 bit
     report_type = *data;
 
     switch(report_type) {
@@ -277,18 +277,27 @@ void ais_parse::decode_ais(char *ascii, int len, bool crc_ok)
     d_payload << str;
 
     switch(report_type) {
-    case 1:
-    case 2:
-    case 3: decode_position_123A(data, len, str); break;
-    case 4: decode_base_station(data, len, str); break;
-    case 5: decode_static_and_voyage_data(data, len, str); break;
+    case  1:
+    case  2:
+    case  3: decode_position_123A(data, len, str); break;
+    case  4: decode_base_station(data, len, str); break;
+    case  5: decode_static_and_voyage_data(data, len, str); break;
 
-   // case 9: decode_sar_aircraft_position(data+6, len, str); break;
+    case  9: decode_sar_aircraft_position(data, len, str); break;
+    case 10:
+    case 11: decode_utc_inquiry(data, len, str); break;
+    case 12:
+    case 13: decode_addr_ack_safety_msg(data, len, str); break;
+    case 14: decode_safety_broadcast_msg(data, len, str); break;
+    case 15: decode_interrogation(data, len, str); break;
+    case 16: decode_assignment_mode_command(data, len, str); break;
+    case 17: decode_dgnss_broadcast_bin_msg(data, len, str); break;
+
+
 
     default:
         break;
     }
-
 
     free(data);
     free(str);
@@ -307,36 +316,16 @@ void ais_parse::decode_sar_aircraft_position(unsigned char *ais, int len, char *
             return;
     }
 
-    unsigned int v1, v2, v3;
-    double d, lon, lat;
-    bool error;
-    int i;
+    unsigned int v1;
 
-    // Altitude 38-49 12 bit
-    v1 = (ais[0] & 0x0f) << 8 | ais[1] << 2 | (ais[2] & 0x30) >> 4;
+    v1 = ais_value(ais, 38, 12);
     if(v1 != 4095) {
-        if(v1 == 4094)
-            sprintf(str, "Altitude: %d m or higher\n", v1);
-        else
-            sprintf(str, "Altitude: %d m\n", v1);
-
+        sprintf(str, "Altitude: %d m %s", v1, v1 == 4095 ? "or higher\n":"\n");
         d_payload << str;
     }
 
-    // Speed over ground 50-59 10 bit
-    v1 = (ais[2] & 0x0f) << 6 | ais[3];
-    if(v1 != 1023) {
-        if(v1 == 1022)
-            sprintf(str, "Speed: %d knots or higher\n", v1);
-        else
-            sprintf(str, "Speed: %d knots\n", v1);
-
-        d_payload << str;
-    }
-
-    // lon lat 61-88, 89-115 28+27 bit
-    //print_position(ais + 4, str, "aircraft");
-    // Course Over Ground 116-127 12 bit
+    print_speed_over_ground(ais, 50, str, true);
+    print_position(ais, 61, str, "aircraft");
     print_course_over_ground(ais, 116, str);
 
 }
@@ -355,7 +344,7 @@ void ais_parse::decode_static_and_voyage_data(unsigned char *ais, int len, char 
     unsigned int v1;
     bool error;
 
-    sprintf(str, "AIS version: %d\n", ais_value(ais, 38, 2) & 0x03);
+    sprintf(str, "AIS version: %d\n", ais_value(ais, 38, 2));
     d_payload << str;
 
     sprintf(str, "IMO Number: %d\n", ais_value(ais, 40, 30));
@@ -364,9 +353,6 @@ void ais_parse::decode_static_and_voyage_data(unsigned char *ais, int len, char 
     d_payload << "Call Sign: " << get_ais_text(ais, 70, 7, str) << "\n";
     d_payload << "Vessel Name: " << get_ais_text(ais, 112, 20, str) << "\n";
 
-//    return;
-
-    // Vessel Name 112-231 120 bit text
     error = false;
 
     v1 = ais_value(ais, 232, 8);
@@ -393,7 +379,7 @@ void ais_parse::decode_static_and_voyage_data(unsigned char *ais, int len, char 
     case 50: strcpy(str, "Pilot vessel\n"); break;
     case 51: strcpy(str, "Search and Rescue vessel\n"); break;
     case 52: strcpy(str, "Tug\n"); break;
-    case 53: strcpy(str, "Port Tender\n"); break;
+    case 53: strcpy(str, "Port Tender (vessel anchored off shore)\n"); break;
     case 54: strcpy(str, "Anti-pollution equipment\n"); break;
     case 55: strcpy(str, "Law Enforcement\n"); break;
     case 58: strcpy(str, "Medical Transport\n"); break;
@@ -482,8 +468,7 @@ void ais_parse::decode_position_123A(unsigned char *ais, int len, char *str)
     bool error;
     int i;
 
-    // Navigation Status bit 38-41 len 4
-    value = ais_value(ais, 38, 4); //ais[6] & 0x0f;
+    value = ais_value(ais, 38, 4);
     error = false;
 
     switch(value) {
@@ -497,7 +482,6 @@ void ais_parse::decode_position_123A(unsigned char *ais, int len, char *str)
     case  7: strcpy(str, "Navigation Status: Engaged in Fishing\n"); break;
     case  8: strcpy(str, "Navigation Status: Under way sailing\n"); break;
 
-    // skip reserved 9-14 and undefined 15
     default:
         error = true;
     }
@@ -558,16 +542,13 @@ void ais_parse::decode_base_station(unsigned char *ais, int len, char *str)
 
     print_position_fix_type(ais, 134, str);
 
-    // UTC timestamp
-    v1 = ais_value(ais, 38, 14);
-    v2 = ais_value(ais, 52, 4);
-    v3 = ais_value(ais, 56, 5);
-    v4 = ais_value(ais, 61, 5);
-
-    sprintf(str, "%d-%02d-%02d %02d:%02d:%02d UTC\n", v1, v2, v3, v4, ais[11], ais[12]);
+    sprintf(str, "%d-%02d-%02d %02d:%02d:%02d UTC\n",
+            ais_value(ais, 38, 14),
+            ais_value(ais, 52, 4),
+            ais_value(ais, 56, 5),
+            ais_value(ais, 61, 5), ais[11], ais[12]);
     d_payload << str;
 
-    // lon 79-106 28 bit, lat 107-133 27 bit
     print_position(ais, 79, str, "station");
 
     if(ais[26] == 0 && ais[27] != 0) {
@@ -576,33 +557,158 @@ void ais_parse::decode_base_station(unsigned char *ais, int len, char *str)
     }
 }
 
+void ais_parse::decode_utc_inquiry(unsigned char *ais, int len, char *str)
+{
+    if(len != 12) {
+        if(d_verbose & V_DEBUG_2)
+            printf("Erroneous report size %d bit, it should be 72 bit\n", len*6);
+
+        if(!(d_verbose & V_DEBUG_3))
+            return;
+    }
+
+    sprintf(str, "Destination MMSI: %d\n", ais_value(ais, 40, 30));
+    d_payload << str;
+}
+
+void ais_parse::decode_addr_ack_safety_msg(unsigned char *ais, int len, char *str)
+{
+    if(len <= 12) {
+        if(d_verbose & V_DEBUG_2)
+            printf("Erroneous report size %d bit, it should be >72 bit\n", len*6);
+
+        if(!(d_verbose & V_DEBUG_3))
+            return;
+    }
+
+    sprintf(str, "Sequence Number: %d\n", ais_value(ais, 38, 2)); d_payload << str;
+    sprintf(str, "Destination MMSI: %d\n", ais_value(ais, 40, 30)); d_payload << str;
+    d_payload << "Message: " << get_ais_text(ais, 72, len - 20, str) << "\n";
+}
+
+void ais_parse::decode_safety_broadcast_msg(unsigned char *ais, int len, char *str)
+{
+    if(len < 7) {
+        if(d_verbose & V_DEBUG_2)
+            printf("Erroneous report size %d bit, it should be >42 bit\n", len*6);
+
+        if(!(d_verbose & V_DEBUG_3))
+            return;
+    }
+
+    // I wonder if lenght should be in bits? 40/6 = 6.667 -> 7 byte
+    d_payload << "Message: " << get_ais_text(ais, 40, len - 7, str) << "\n";
+}
+
+void ais_parse::decode_interrogation(unsigned char *ais, int len, char *str)
+{
+    if(len < 14) {
+        if(d_verbose & V_DEBUG_2)
+            printf("Erroneous report size %d bit, it should be 88-160 bit\n", len*6);
+
+        if(!(d_verbose & V_DEBUG_3))
+            return;
+    }
+
+    sprintf(str, "Interrogated MMSI: %d\n",   ais_value(ais,  40, 30)); d_payload << str;
+    sprintf(str, "First message type: %d\n",  ais_value(ais,  70,  6)); d_payload << str;
+    sprintf(str, "First slot offset: %d\n",   ais_value(ais,  76, 12)); d_payload << str;
+    sprintf(str, "Second message type: %d\n", ais_value(ais,  90,  6)); d_payload << str;
+    sprintf(str, "Second slot offset: %d\n",  ais_value(ais,  96, 12)); d_payload << str;
+    sprintf(str, "Interrogated MMSI: %d\n",   ais_value(ais, 110, 30)); d_payload << str;
+    sprintf(str, "First message type: %d\n",  ais_value(ais, 140,  6)); d_payload << str;
+    sprintf(str, "First slot offset: %d\n",   ais_value(ais, 146, 12)); d_payload << str;
+}
+
+void ais_parse::decode_assignment_mode_command(unsigned char *ais, int len, char *str)
+{
+    if(!(len == 16 || len == 24)) {
+        if(d_verbose & V_DEBUG_2)
+            printf("Erroneous report size %d bit, it should be 96 or 144 bit\n", len*6);
+
+        if(!(d_verbose & V_DEBUG_3))
+            return;
+    }
+
+    sprintf(str, "Destination A MMSI: %d\n", ais_value(ais, 40, 30)); d_payload << str;
+    sprintf(str, "Offset A: %d\n",           ais_value(ais, 70, 12)); d_payload << str;
+    sprintf(str, "Increment A: %d\n",        ais_value(ais, 82, 10)); d_payload << str;
+
+    if(len == 24) {
+        sprintf(str, "Destination B MMSI: %d\n", ais_value(ais,  92, 30)); d_payload << str;
+        sprintf(str, "Offset B: %d\n",           ais_value(ais, 122, 12)); d_payload << str;
+        sprintf(str, "Increment B: %d\n",        ais_value(ais, 134, 10)); d_payload << str;
+    }
+}
+
+void ais_parse::decode_dgnss_broadcast_bin_msg(unsigned char *ais, int len, char *str)
+{
+    if(len < 13) {
+        if(d_verbose & V_DEBUG_2)
+            printf("Erroneous report size %d bit, it should be 80-816 bit\n", len*6);
+
+        if(!(d_verbose & V_DEBUG_3))
+            return;
+    }
+
+#if 0
+
+    // todo: I think print position display it incorrectly?
+    int i, i2;
+
+    i  = (int) ais_value(ais, 40, 18); // lon in minutes/10
+    i2 = (int) ais_value(ais, 58, 17); // lat in minutes/10
+
+    if(i < -180 || i > 180 || i2 < -90 || i2 > 90) {
+
+    }
+#endif
+
+    print_position(ais, 40, str, "corrections for GPS");
+    print_ais_payload_hex(ais, 80, len - 13, "DGNSS correction data (hex):\n");
+}
+
+void ais_parse::print_ais_payload_hex(unsigned char *ais, int bit_pos, int len, const char *data_desc)
+{
+    int i, hex;
+
+    d_payload << data_desc;
+    for(i=0; i<len; i++) {
+        hex = (int) ais_value(ais, bit_pos + i*6, 6);
+
+        if(i > 0) {
+            if((i % 16) == 0 || (i - 1) == len)
+                d_payload << "\n";
+            else
+                d_payload << " ";
+        }
+
+        d_payload << std::setw(2) << std::setfill('0') << std::hex << std::uppercase << int(hex);
+    }
+}
 
 void ais_parse::print_speed_over_ground(unsigned char *ais, int bit_pos, char *str, bool ship)
 {
     int value = ais_value(ais, bit_pos, 10);
     double speed = ship ? (((double) value) / 10.0):value;
 
-    if(value == 1023)
-        return;
-    else if(value == 1022)
-        sprintf(str, "Speed Over Ground: %.*f knots or more\n", ship ? 1:0, speed);
-    else
-        sprintf(str, "Speed Over Ground: %.*f knots\n", ship ? 1:0, speed);
+    if(value != 1023) {
+        sprintf(str, "Speed Over Ground: %.*f %s",
+                ship ? 1:0, speed,
+                value == 1022 ? "knots or more\n":"\n");
 
-    d_payload << str;
+        d_payload << str;
+    }
 }
 
 void ais_parse::print_course_over_ground(unsigned char *ais, int bit_pos, char *str)
 {
-    unsigned int value;
-    double d;
-
-    value = (ais[0] & 0x0f) << 8 | ais[1] << 2 | (ais[2] & 0x30) >> 4; // 4 bit
-    value = ais_value(ais, bit_pos, 12);
+    unsigned int value = ais_value(ais, bit_pos, 12);
 
     if(value != 3600) {
-        d = ((double) value) / 10.0;
-        sprintf(str, "Course Over Ground: %.1f%s\n", d, DEG_SIGN);
+        sprintf(str, "Course Over Ground: %.1f%s\n",
+                ((double) value) / 10.0,
+                DEG_SIGN);
         d_payload << str;
     }
 }
@@ -611,11 +717,9 @@ void ais_parse::get_lonlat(unsigned char *ais, int bit_pos, double *lon, double 
 {
     unsigned int v;
 
-    // lon 28 bit
     v = ais_value(ais, bit_pos, 28);
     *lon = ((double) v) / 600000.0;
 
-    // lat 27 bit
     v = ais_value(ais, bit_pos + 28, 27);
     *lat = ((double) v) / 600000.0;
 }
@@ -677,8 +781,7 @@ void ais_parse::toDMS(double ll, int *d, int *m, double *s)
 
 void ais_parse::print_position_fix_type(unsigned char *ais, int bit_pos, char *str)
 {
-    // Type of EPFD 134-137 4 bit
-    int type = ais_value(ais, bit_pos, 4);
+    int type = ais_value(ais, bit_pos, 4) & 0x0f;
     bool error = false;
 
     switch(type) {
@@ -701,12 +804,16 @@ void ais_parse::print_position_fix_type(unsigned char *ais, int bit_pos, char *s
 
 unsigned long ais_parse::ais_value(unsigned char *ais, int bit_pos, int len)
 {
-    unsigned long rc;
+    unsigned long rc, mask;
     unsigned char c;
     int i;
 
     int byte = bit_pos / 6;
     int bits = bit_pos % 6;
+
+    mask = 0;
+    for(i=0; i<len; i++)
+        mask |= 1 << i;
 
     c = 0;
     for(i=(6 - bits); i<6; i++)
@@ -716,7 +823,7 @@ unsigned long ais_parse::ais_value(unsigned char *ais, int bit_pos, int len)
     rc = (ais[byte] & (c ^ 0x3f)) << len;
 
     if(len == 0)
-        return rc;
+        return (rc & mask);
 
     byte += 1;
     while(len >= 6) {
@@ -725,7 +832,7 @@ unsigned long ais_parse::ais_value(unsigned char *ais, int bit_pos, int len)
     }
 
     if(len == 0)
-        return rc;
+        return (rc & mask);
 
     bits = 6 - len;
     c = 0;
@@ -734,7 +841,7 @@ unsigned long ais_parse::ais_value(unsigned char *ais, int bit_pos, int len)
 
     rc |= (ais[byte] & (c ^ 0x3f)) >> bits;
 
-    return rc;
+    return (rc & mask);
 }
 
 char *ais_parse::get_ais_text(unsigned char *ais, int bit_pos, int len6, char *buf)
@@ -742,6 +849,11 @@ char *ais_parse::get_ais_text(unsigned char *ais, int bit_pos, int len6, char *b
     unsigned char v;
     char ch, prev_ch = 'a';
     int i;
+
+    *buf = '\0';
+
+    if(len6 < 1)
+        return buf;
 
     for(i=0; i<len6; i++) {
         v = ais_value(ais, bit_pos + i*6, 6);

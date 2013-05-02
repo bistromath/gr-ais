@@ -81,18 +81,28 @@ private:
     void decode_position_123A(unsigned char *ais, int len, char *str);
     void decode_static_and_voyage_data(unsigned char *ais, int len, char *str);
     void decode_sar_aircraft_position(unsigned char *ais, int len, char *str);
+    void decode_utc_inquiry(unsigned char *ais, int len, char *str);
+    void decode_addr_ack_safety_msg(unsigned char *ais, int len, char *str);
+    void decode_safety_broadcast_msg(unsigned char *ais, int len, char *str);
+    void decode_interrogation(unsigned char *ais, int len, char *str);
+    void decode_assignment_mode_command(unsigned char *ais, int len, char *str);
+    void decode_dgnss_broadcast_bin_msg(unsigned char *ais, int len, char *str);
+
+
+
 
     // decoder utils
     void print_position(unsigned char *ais, int bit_pos, char *str, const char *obj_type);
     void print_course_over_ground(unsigned char *ais, int bit_pos, char *str);
     void print_speed_over_ground(unsigned char *ais, int bit_pos, char *str, bool ship);
     void print_position_fix_type(unsigned char *ais, int bit_pos, char *str);
+    void print_ais_payload_hex(unsigned char *ais, int bit_pos, int len, const char *data_desc);
 
-    char *get_ais_text(unsigned char *ais, int bit_pos, int len6, char *buf);
-    void get_lonlat(unsigned char *ais, int bit_pos, double *lon, double *lat);
+    char   *get_ais_text(unsigned char *ais, int bit_pos, int len6, char *buf);
+    void   get_lonlat(unsigned char *ais, int bit_pos, double *lon, double *lat);
     double wgs84distance(double lon1, double lat1, double lon2, double lat2);
     double wgs84bearing(double lon1, double lat1, double lon2, double lat2);        
-    void toDMS(double ll, int *d, int *m, double *s);
+    void   toDMS(double ll, int *d, int *m, double *s);
 
     unsigned long ais_value(unsigned char *ais, int bit_pos, int len);
     inline char data_to_ascii(unsigned long unpacked)
