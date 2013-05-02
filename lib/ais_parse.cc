@@ -209,10 +209,8 @@ void ais_parse::decode_ais(char *ascii, int len, bool crc_ok)
 
     value = ascii_to_ais(*ascii);
     if(value == 0 || value > 27) {
-        if(d_verbose & V_DEBUG_2)
-            printf("Unknown AIS report type: %d\n", value);
-
-        return;
+        if(!(d_verbose & V_DEBUG_3))
+            return;
     }
 
     unsigned char *data;
@@ -240,6 +238,7 @@ void ais_parse::decode_ais(char *ascii, int len, bool crc_ok)
             d_designator == 'A' ? 161.975:162.025);
     d_payload << str;
 
+    bool error = false;
     report_type = *data;
 
     switch(report_type) {
@@ -270,11 +269,27 @@ void ais_parse::decode_ais(char *ascii, int len, bool crc_ok)
     case 25: d_payload << "Single Slot Binary Message\n"; break;
     case 26: d_payload << "Multiple Slot Binary Message With Communications State\n"; break;
     case 27: d_payload << "Position Report For Long-Range Applications\n"; break;
+
+    default:
+        error = true;
     }
 
     value = ais_value(data, 8, 30);
     sprintf(str, "Mobile Marine Service Identifier: %d\n", value);
     d_payload << str;
+
+    if(error) {
+        sprintf(str, "Unknown AIS report type %d\n", report_type);
+        d_payload << str;
+
+        free(data);
+        free(str);
+
+        gr_message_sptr msg = gr_make_message_from_string(std::string(d_payload.str()));
+        d_queue->handle(msg);
+
+        return;
+    }
 
     switch(report_type) {
     case  1:
@@ -292,11 +307,13 @@ void ais_parse::decode_ais(char *ascii, int len, bool crc_ok)
     case 15: decode_interrogation(data, len, str); break;
     case 16: decode_assignment_mode_command(data, len, str); break;
     case 17: decode_dgnss_broadcast_bin_msg(data, len, str); break;
+    case 18: decode_class_b_position_report(data, len, str, false); break;
+    case 19: decode_class_b_position_report(data, len, str, true); break;
+    case 20: break; // to be added if needed?
+    case 21: decode_aid_to_navigation(data, len, str); break;
 
 
 
-    default:
-        break;
     }
 
     free(data);
@@ -351,7 +368,12 @@ void ais_parse::decode_static_and_voyage_data(unsigned char *ais, int len, char 
     d_payload << str;
 
     d_payload << "Call Sign: " << get_ais_text(ais, 70, 7, str) << "\n";
-    d_payload << "Vessel Name: " << get_ais_text(ais, 112, 20, str) << "\n";
+
+#if 1
+    print_ship_properties(ais, 112, str);
+#else
+
+    d_payload << "Ship Name: " << get_ais_text(ais, 112, 20, str) << "\n";
 
     error = false;
 
@@ -436,6 +458,10 @@ void ais_parse::decode_static_and_voyage_data(unsigned char *ais, int len, char 
         sprintf(str, "Dimension to Starboard: %d m%s", v1, v1 == 63 ? " or greater\n":"\n");
         d_payload << str;
     }
+#endif
+
+
+
 
     sprintf(str, "Draught: %.1f m\n", ((double) ais_value(ais, 294, 8)) / 10.0);
     d_payload << str;
@@ -452,6 +478,7 @@ void ais_parse::decode_static_and_voyage_data(unsigned char *ais, int len, char 
         d_payload << str;
     }
 }
+
 
 void ais_parse::decode_position_123A(unsigned char *ais, int len, char *str)
 {
@@ -496,9 +523,9 @@ void ais_parse::decode_position_123A(unsigned char *ais, int len, char *str)
     if(i < -127 || i > 127 || i == 0)
         error = true;
     if(i == 127)
-        sprintf(str, "Rate of Turn: Right at more than 5%s per 30 sec\n", DEG_SIGN);
+        sprintf(str, "Rate of Turn: Right at more than 5%s per 30 second\n", DEG_SIGN);
     else if(i == -127)
-        sprintf(str, "Rate of Turn: Left at more than 5%s per 30 sec\n", DEG_SIGN);
+        sprintf(str, "Rate of Turn: Left at more than 5%s per 30 second\n", DEG_SIGN);
     else {
         d = pow(((double) i) / 4.733, 2);
         sprintf(str, "Rate of Turn: %s at %.3f%s/min\n", i > 0 ? "Right":"Left", d, DEG_SIGN);
@@ -517,6 +544,10 @@ void ais_parse::decode_position_123A(unsigned char *ais, int len, char *str)
         d_payload << str;
     }
 
+    value = ais_value(ais, 137, 6);
+    sprintf(str, "Time Stamp: %d seconds\n", value, DEG_SIGN);
+    d_payload << str;
+
     value = ais_value(ais, 143, 2);
     if(value) {
         if(value == 1)
@@ -526,6 +557,142 @@ void ais_parse::decode_position_123A(unsigned char *ais, int len, char *str)
 
         d_payload << str;
     }
+
+    print_raim(ais, 148, str);
+}
+
+void ais_parse::decode_class_b_position_report(unsigned char *ais, int len, char *str, bool extended)
+{
+    int i = extended ? 312:168;
+
+    if((len*6) != i) {
+        if(d_verbose & V_DEBUG_2)
+            printf("Erroneous report size %d bit, it should be %d bit\n", len*6, i);
+
+        if(!(d_verbose & V_DEBUG_3))
+            return;
+    }
+
+    unsigned long value;
+
+    print_speed_over_ground(ais, 46, str, true);
+    print_position(ais, 57, str, "vessel");
+    print_course_over_ground(ais, 112, str);
+
+    value = ais_value(ais, 124, 9);
+    if(value >= 0 && value < 360) {
+        sprintf(str, "True Heading: %d%s\n", value, DEG_SIGN);
+        d_payload << str;
+    }
+
+    value = ais_value(ais, 133, 6);
+    sprintf(str, "Time Stamp: %d UTC seconds\n", value);
+    d_payload << str;
+
+    if(extended) {
+        print_raim(ais, 305, str);
+
+        value = ais_value(ais, 307, 1);
+        sprintf(str, "Station Mode: %s\n",
+                value == 0 ? "Station operating in autonomous and continuous mode":"Station operating in assigned mode");
+        d_payload << str;
+    }
+    else {
+        value = ais_value(ais, 141, 1);
+        sprintf(str, "Carrier Sense Unit: %s\n",
+                value == 0 ? "Class B SOTDMA":"Class B Carrier Sense");
+        d_payload << str;
+
+        value = ais_value(ais, 142, 1);
+        sprintf(str, "Display: %s\n",
+                value == 0 ? "No display available. Not capable of displaying Message 12 and 14":"Equipped with integrated display displaying Message 12 and 14");
+        d_payload << str;
+
+        value = ais_value(ais, 143, 1);
+        sprintf(str, "VHF Digital Selective Calling: %s\n",
+                value == 0 ? "Not equipped":"Equipped with DSC function (dedicated or time-shared)");
+        d_payload << str;
+
+        value = ais_value(ais, 144, 1);
+        sprintf(str, "VHF Band capability: %s\n",
+                value == 0 ? "Capable of operating over the upper 525 kHz band of the marine band":"Capable of operating over the whole marine band");
+        d_payload << str;
+
+        value = ais_value(ais, 145, 1);
+        sprintf(str, "Message 22 capability: %s\n",
+                value == 0 ? "No frequency management via Message 22 , operating on AIS1, AIS2 only":"Frequency management via Message 22");
+        d_payload << str;
+
+        value = ais_value(ais, 146, 1);
+        sprintf(str, "Station Mode: %s\n",
+                value == 0 ? "Station operating in autonomous and continuous mode":"Station operating in assigned mode");
+        d_payload << str;
+
+        print_raim(ais, 147, str);
+    }
+}
+
+void ais_parse::decode_aid_to_navigation(unsigned char *ais, int len, char *str)
+{
+    if(len < 45) {
+        if(d_verbose & V_DEBUG_2)
+            printf("Erroneous report size %d bit, it should be >272 bit\n", len*6);
+
+        if(!(d_verbose & V_DEBUG_3))
+            return;
+    }
+
+    bool error = false;
+    unsigned long v = ais_value(ais, 38, 5);
+
+    switch(v) {
+    case  0: strcpy("Not specified\n"); break;
+    case  1: strcpy("Reference point\n"); break;
+    case  2: strcpy("Radar transponder marking a navigation hazard\n"); break;
+    case  3: strcpy("Fixed structure off shore, such as oil platforms, wind farms, rigs, etc\n"); break;
+    case  5: strcpy("Light, without sectors\n"); break;
+    case  6: strcpy("Light, with sectors\n"); break;
+    case  7: strcpy("Leading Light Front\n"); break;
+    case  8: strcpy("Leading Light Rear\n"); break;
+    case  9: strcpy("Beacon, Cardinal North\n"); break;
+    case 10: strcpy("Beacon, Cardinal East\n"); break;
+    case 11: strcpy("Beacon, Cardinal South\n"); break;
+    case 12: strcpy("Beacon, Cardinal West\n"); break;
+    case 13: strcpy("Beacon, Port hand\n"); break;
+    case 14: strcpy("Beacon, Starboard hand\n"); break;
+    case 15: strcpy("Beacon, Preferred Channel port hand\n"); break;
+    case 16: strcpy("Beacon, Preferred Channel starboard hand\n"); break;
+    case 17: strcpy("Beacon, Isolated danger\n"); break;
+    case 18: strcpy("Beacon, Safe water\n"); break;
+    case 19: strcpy("Beacon, Special mark\n"); break;
+    case 20: strcpy("Cardinal Mark North\n"); break;
+    case 21: strcpy("Cardinal Mark East\n"); break;
+    case 22: strcpy("Cardinal Mark South\n"); break;
+    case 23: strcpy("Cardinal Mark West\n"); break;
+    case 24: strcpy("Port hand Mark\n"); break;
+    case 25: strcpy("Starboard hand Mark\n"); break;
+    case 26: strcpy("Preferred Channel Port hand\n"); break;
+    case 27: strcpy("Preferred Channel Starboard hand\n"); break;
+    case 28: strcpy("Isolated danger\n"); break;
+    case 29: strcpy("Safe Water\n"); break;
+    case 30: strcpy("Special Mark\n"); break;
+    case 31: strcpy("Light Vessel / LANBY / Rigs\n"); break;
+
+    default:
+        error = true;
+    }
+
+    if(!error)
+        d_payload << "Navigation Aid Type: " << str;
+}
+
+void ais_parse::print_raim(unsigned char *ais, int bit_pos, char *str)
+{
+    int i = ais_value(ais, bit_pos, 1);
+
+    sprintf(str, "Receiver Autonomous Integrity Monitoring: %s\n",
+             i == 0 ? "RAIM not in use":"RAIM in use");
+    d_payload << str;
 }
 
 void ais_parse::decode_base_station(unsigned char *ais, int len, char *str)
@@ -800,6 +967,104 @@ void ais_parse::print_position_fix_type(unsigned char *ais, int bit_pos, char *s
 
     if(!error)
         d_payload << str;
+}
+
+void ais_parse::print_ship_properties(unsigned char *ais, int bit_pos, char *str)
+{
+    int bp = bit_pos;
+    d_payload << "Ship Name: " << get_ais_text(ais, bp, 20, str) << "\n";
+    bp += 20;
+
+    bool error = false;
+    int v1 = ais_value(ais, bp, 8);
+    bp += 8;
+
+    switch(v1) {
+    case 20: strcpy(str, "Wing in ground (WIG)\n"); break;
+    case 21:
+    case 22:
+    case 23:
+    case 24: sprintf(str, "Wing in ground (WIG). Hazardous category %c (%d)\n", 68 - (24 - v1), v1); break;
+    case 30: strcpy(str, "Fishing\n"); break;
+    case 31: strcpy(str, "Towing\n"); break;
+    case 32: strcpy(str, "Towing: length exceeds 200m or breadth exceeds 25m\n"); break;
+    case 33: strcpy(str, "Dredging or underwater ops\n"); break;
+    case 34: strcpy(str, "Diving ops\n"); break;
+    case 35: strcpy(str, "Military ops\n"); break;
+    case 36: strcpy(str, "Sailing\n"); break;
+    case 37: strcpy(str, "Pleasure Craft\n"); break;
+    case 40: strcpy(str, "High speed craft (HSC)\n"); break;
+    case 41:
+    case 42:
+    case 43:
+    case 44: sprintf(str, "High speed craft (HSC). Hazardous category %c (%d)\n", 68 - (44 - v1), v1); break;
+    case 49: strcpy(str, "High speed craft (HSC)\n"); break;
+    case 50: strcpy(str, "Pilot vessel\n"); break;
+    case 51: strcpy(str, "Search and Rescue vessel\n"); break;
+    case 52: strcpy(str, "Tug\n"); break;
+    case 53: strcpy(str, "Port Tender (vessel anchored off shore)\n"); break;
+    case 54: strcpy(str, "Anti-pollution equipment\n"); break;
+    case 55: strcpy(str, "Law Enforcement\n"); break;
+    case 58: strcpy(str, "Medical Transport\n"); break;
+    case 59: strcpy(str, "Noncombatant ship according to RR Resolution No. 18\n"); break;
+    case 60: strcpy(str, "Passenger\n"); break;
+    case 61:
+    case 62:
+    case 63:
+    case 64: sprintf(str, "Passenger. Hazardous category %c (%d)\n", 68 - (64 - v1), v1); break;
+    case 69: strcpy(str, "Passenger\n"); break;
+    case 70: strcpy(str, "Cargo\n"); break;
+    case 71:
+    case 72:
+    case 73:
+    case 74: sprintf(str, "Cargo. Hazardous category %c (%d)\n", 68 - (74 - v1), v1); break;
+    case 79: strcpy(str, "Cargo\n"); break;
+    case 80: strcpy(str, "Tanker\n"); break;
+    case 81:
+    case 82:
+    case 83:
+    case 84: sprintf(str, "Tanker. Hazardous category %c (%d)\n", 68 - (84 - v1), v1); break;
+    case 89: strcpy(str, "Tanker\n"); break;
+    case 90: strcpy(str, "Other Type\n"); break;
+    case 91:
+    case 92:
+    case 93:
+    case 94: sprintf(str, "Other Type. Hazardous category %c (%d)\n", 68 - (84 - v1), v1); break;
+    case 99: strcpy(str, "Other Type\n"); break;
+
+    default:
+        error = true;
+    }
+
+    if(!error)
+        d_payload << "Ship Type: " << str;
+
+    v1 = ais_value(ais, bp, 9);
+    bp += 9;
+    if(v1) {
+        sprintf(str, "Dimension to Bow: %d m%s", v1, v1 == 511 ? " or greater\n":"\n");
+        d_payload << str;
+    }
+
+    v1 = ais_value(ais, bp, 9);
+    bp += 9;
+    if(v1) {
+        sprintf(str, "Dimension to Stern: %d m%s", v1, v1 == 511 ? " or greater\n":"\n");
+        d_payload << str;
+    }
+
+    v1 = ais_value(ais, bp, 6);
+    bp += 6;
+    if(v1) {
+        sprintf(str, "Dimension to Port: %d m%s", v1, v1 == 63 ? " or greater\n":"\n");
+        d_payload << str;
+    }
+    v1 = ais_value(ais, bp, 6);
+    bp += 6;
+    if(v1) {
+        sprintf(str, "Dimension to Starboard: %d m%s", v1, v1 == 63 ? " or greater\n":"\n");
+        d_payload << str;
+    }
 }
 
 unsigned long ais_parse::ais_value(unsigned char *ais, int bit_pos, int len)
