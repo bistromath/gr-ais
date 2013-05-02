@@ -208,7 +208,7 @@ void ais_parse::decode_ais(char *ascii, int len, bool crc_ok)
     d_payload.str("");
 
     value = ascii_to_ais(*ascii);
-    if(value > 27) {
+    if(value == 0 || value > 27) {
         if(d_verbose & V_DEBUG_2)
             printf("Unknown AIS report type: %d\n", value);
 
