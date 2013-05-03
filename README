@@ -40,8 +40,8 @@ gr-ais requires:
 * Python
 * Gnuradio
 * Ettus UHD for use with USRPs
-* osmosdr (any version) for use with RTLSDR dongles (work in progress)
-* CMake later
+* osmosdr for use with RTLSDR dongles (work in progress)
+* CMake
 
 ========================================================================
 BUILDING
