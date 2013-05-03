@@ -776,8 +776,6 @@ void ais_parse::decode_base_station(unsigned char *ais, int len, char *str)
             return;
     }
 
-    unsigned int v1, v2, v3, v4;
-
     print_position_fix_type(ais, 134, str);
 
     sprintf(str, "%d-%02d-%02d %02d:%02d:%02d UTC\n",
@@ -1093,6 +1091,8 @@ unsigned long ais_parse::ais_value(unsigned char *ais, int bit_pos, int len)
     int byte = bit_pos / 6;
     int bits = bit_pos % 6;
 
+    // len is in bits
+
     mask = 0;
     for(i=0; i<len; i++)
         mask |= 1 << i;
@@ -1144,6 +1144,7 @@ char *ais_parse::get_ais_text(unsigned char *ais, int bit_pos, int len6, char *b
 #if 0
         if((prev_ch == 32 && ch == 32) || (prev_ch == '@' && ch == '@'))
 #else
+        // I wonder if the msg should stop at ais char 0 -> @ ie null (0)?
         if(ch == '@' || (prev_ch == 32 && ch == 32))
 #endif
             break;
