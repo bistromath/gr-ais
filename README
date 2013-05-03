@@ -1,0 +1,59 @@
+
+ Copyright 2006, 2013 Free Software Foundation, Inc.
+ 
+ This file is part of GNU Radio
+ 
+ GNU Radio is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; either version 3, or (at your option)
+ any later version.
+ 
+ GNU Radio is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ 
+ You should have received a copy of the GNU General Public License
+ along with GNU Radio; see the file COPYING.  If not, write to
+ the Free Software Foundation, Inc., 51 Franklin Street,
+ Boston, MA 02110-1301, USA.
+
+========================================================================
+AUTHOR
+
+Core: 			Nick Foster <bistromath@gmail.com>
+Packet decoder:		Patrik Tast <patrik@poes-weather.com>
+
+========================================================================
+OVERVIEW
+
+The Automatic Identification System (AIS) is an automatic tracking 
+system used on ships and by vessel traffic services (VTS) for 
+identifying and locating vessels by electronically exchanging 
+data with other nearby ships AIS Base stations and Satellites.
+
+========================================================================
+REQUIREMENTS
+
+gr-ais requires:
+
+* Python
+* Gnuradio
+* Ettus UHD for use with USRPs
+* osmosdr (any version) for use with RTLSDR dongles (work in progress)
+* CMake later
+
+========================================================================
+BUILDING
+
+gr-ais uses CMake as its build system. To build, from the top
+level directory, type:
+
+$ mkdir build
+$ cd build
+$ cmake ../
+$ make
+$ sudo make install
+
+Help, type:
+$ ais_rx.py --help

@@ -1,5 +1,5 @@
 /*
- * Copyright 2004,2006,2007 Free Software Foundation, Inc.
+ * Copyright 2004,2006,2007,2013 Free Software Foundation, Inc.
  * 
  * This file is part of GNU Radio
  * 
@@ -17,6 +17,14 @@
  * along with GNU Radio; see the file COPYING.  If not, write to
  * the Free Software Foundation, Inc., 51 Franklin Street,
  * Boston, MA 02110-1301, USA.
+ */
+
+/*
+   Useful AIS packet documents
+
+   http://www.navcen.uscg.gov/?pageName=AISmain
+   http://gpsd.berlios.de/AIVDM.html#_types_1_2_and_3_position_report_class_a
+   http://rl.se/aivdm
  */
 
 #ifdef HAVE_CONFIG_H
@@ -129,7 +137,7 @@ int ais_parse::work(int noutput_items,
     //now we've got a valid, framed packet
     uint64_t datalen = end_mark - start_mark - 8; //includes CRC, discounts end of frame marker
     if(d_verbose & V_DEBUG_4)
-        std::cout << d_designator << " Found packet with length (- CRC) " << (datalen - 16) << "\n" << std::endl;
+        std::cout << d_designator << " Found packet with length (-crc 16 bit) " << (datalen - 16) << "\n" << std::endl;
 
     char *pkt = new char[datalen];
 
@@ -195,9 +203,7 @@ void ais_parse::parse_data(char *data, int len)
 
 /**
 
-    http://www.navcen.uscg.gov/?pageName=AISmain
-    http://gpsd.berlios.de/AIVDM.html#_types_1_2_and_3_position_report_class_a
-    http://rl.se/aivdm
+    AIS Packet Decoders
 
 **/
 
@@ -388,7 +394,6 @@ void ais_parse::decode_static_and_voyage_data(unsigned char *ais, int len, char 
         d_payload << str;
     }
 }
-
 
 void ais_parse::decode_position_123A(unsigned char *ais, int len, char *str)
 {
@@ -916,7 +921,7 @@ void ais_parse::print_ais_payload_hex(unsigned char *ais, int bit_pos, int len, 
                 d_payload << " ";
         }
 
-        d_payload << std::setw(2) << std::setfill('0') << std::hex << std::uppercase << int(hex);
+        d_payload << std::setw(2) << std::setfill('0') << std::hex << std::uppercase << int(hex) << "\n";
     }
 }
 
@@ -928,7 +933,7 @@ void ais_parse::print_speed_over_ground(unsigned char *ais, int bit_pos, char *s
     if(value != 1023) {
         sprintf(str, "Speed Over Ground: %.*f %s",
                 ship ? 1:0, speed,
-                value == 1022 ? "knots or more\n":"\n");
+                value == 1022 ? "or more\n":"knots\n");
 
         d_payload << str;
     }
@@ -1136,7 +1141,11 @@ char *ais_parse::get_ais_text(unsigned char *ais, int bit_pos, int len6, char *b
         v = ais_value(ais, bit_pos + i*6, 6);
         ch = ais_ascii_table[v & 0x3f];
 
+#if 0
         if((prev_ch == 32 && ch == 32) || (prev_ch == '@' && ch == '@'))
+#else
+        if(ch == '@' || (prev_ch == 32 && ch == 32))
+#endif
             break;
 
         buf[i] = ch;

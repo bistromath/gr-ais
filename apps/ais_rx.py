@@ -147,9 +147,9 @@ def main():
         parser.add_option("-V", "--verbose", type="int", default=1,
                                                 help="Verbosity level. 0=AIS ascii output only, 1=decode packets, >1 various debug levels [default=%default]")
         parser.add_option("", "--lon", type="float", default=21.5593,
-                                                help="Your longitude [default=%default]")
+                                                help="Your longitude in decimal degrees [default=%default]")
         parser.add_option("", "--lat", type="float", default=63.1587,
-                                                help="Your latitude [default=%default]")
+                                                help="Your latitude in decimal degrees [default=%default]")
 
 	(options, args) = parser.parse_args ()
 
