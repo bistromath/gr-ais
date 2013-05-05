@@ -209,25 +209,23 @@ void ais_parse::parse_data(char *data, int len)
 
 void ais_parse::decode_ais(char *ascii, int len, bool crc_ok)
 {
+    unsigned char *data;
     unsigned long value;
+    int report_type, i;
 
     d_payload.str("");
 
-    value = ascii_to_ais(*ascii);
-    if(value == 0 || value > 27) {
+    report_type = ascii_to_ais(*ascii);
+    if(report_type == 0 || report_type > 27) {
         if(!(d_verbose & V_DEBUG_3))
             return;
     }
-
-    unsigned char *data;
-    int i;
 
     // allocate enough so it wont segfault when debugging
     i = (d_verbose & V_DEBUG_2) ? 256:len;
     data = (unsigned char *) malloc(i * sizeof(unsigned char));
 
     char *str = (char *) malloc(512 * sizeof(char));
-    int report_type;
 
     for(i=0; i<len; i++) {
         data[i] = ascii_to_ais(ascii[i]);
@@ -244,8 +242,9 @@ void ais_parse::decode_ais(char *ascii, int len, bool crc_ok)
             d_designator == 'A' ? 161.975:162.025);
     d_payload << str;
 
-    bool error = false;
-    report_type = *data;
+    value = ais_value(data, 8, 30);
+    sprintf(str, "Mobile Marine Service Identifier: %d\n", value);
+    d_payload << str;
 
     switch(report_type) {
     case  1: d_payload << "Position Report Class A\n"; break;
@@ -277,24 +276,10 @@ void ais_parse::decode_ais(char *ascii, int len, bool crc_ok)
     case 27: d_payload << "Position Report For Long-Range Applications\n"; break;
 
     default:
-        error = true;
-    }
-
-    value = ais_value(data, 8, 30);
-    sprintf(str, "Mobile Marine Service Identifier: %d\n", value);
-    d_payload << str;
-
-    if(error) {
         sprintf(str, "Unknown AIS report type %d\n", report_type);
         d_payload << str;
 
-        free(data);
-        free(str);
-
-        gr_message_sptr msg = gr_make_message_from_string(std::string(d_payload.str()));
-        d_queue->handle(msg);
-
-        return;
+        break;
     }
 
     switch(report_type) {
@@ -353,7 +338,6 @@ void ais_parse::decode_sar_aircraft_position(unsigned char *ais, int len, char *
     print_speed_over_ground(ais, 50, str, true);
     print_position(ais, 61, str, "aircraft");
     print_course_over_ground(ais, 116, str);
-
 }
 
 void ais_parse::decode_static_and_voyage_data(unsigned char *ais, int len, char *str)
@@ -387,7 +371,7 @@ void ais_parse::decode_static_and_voyage_data(unsigned char *ais, int len, char 
     d_payload << "Destination: " << get_ais_text(ais, 302, 20, str) << "\n";
 
     v1 = ais_value(ais, 274, 4);
-    if(v1) {
+    if(v1 != 0) {
         sprintf(str, "Estimated Time of Arrival %02d-%02d %02d:%02d UTC\n",
                 v1, ais_value(ais, 278, 5),
                 ais_value(ais, 283, 5), ais_value(ais, 288, 6));
@@ -431,7 +415,7 @@ void ais_parse::decode_position_123A(unsigned char *ais, int len, char *str)
         d_payload << str;
 
     print_speed_over_ground(ais, 50, str, true);
-    print_position(ais, 61, str, "ship");
+    print_position(ais, 61, str, "vessel");
     print_course_over_ground(ais, 116, str);
 
     value = ais_value(ais, 128, 9);
@@ -583,7 +567,7 @@ void ais_parse::decode_aid_to_navigation(unsigned char *ais, int len, char *str)
         d_payload << "Navigation Aid Type: " << str;
 
     d_payload << "Ship Name: " << get_ais_text(ais, 43, 20, str) << "\n";
-    print_position(ais, 164, str, "ship");
+    print_position(ais, 164, str, "vessel");
     print_ship_dimension(ais, 219, str);
     print_position_fix_type(ais, 249, str);
 
@@ -652,7 +636,7 @@ void ais_parse::decode_long_range_msg(unsigned char *ais, int len, char *str)
 
     print_raim(ais, 39, str);
     print_navigation_status(ais, 40, str);
-    print_position(ais, 44, str, "ship");
+    print_position(ais, 44, str, "vessel");
 
     unsigned long v = ais_value(ais, 79, 6);
     if(v < 63) {
@@ -1144,7 +1128,7 @@ char *ais_parse::get_ais_text(unsigned char *ais, int bit_pos, int len6, char *b
 #if 0
         if((prev_ch == 32 && ch == 32) || (prev_ch == '@' && ch == '@'))
 #else
-        // I wonder if the msg should stop at ais char 0 -> @ ie null (0)?
+        // I wonder if the msg should stop at ais ascii char 0 -> @, ie null (0)?
         if(ch == '@' || (prev_ch == 32 && ch == 32))
 #endif
             break;
