@@ -58,5 +58,5 @@ $ sudo make install
 Help, type:
 $ ais_rx.py --help
 
-RX example, type:
+RX example, verbose level=3, decode also packets that fail CRC:
 $ ais_rx.py --subdev=A:0 -V 3 -g 65 
