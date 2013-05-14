@@ -10,7 +10,7 @@ from gnuradio import gr, gru, blks2, optfir
 from gnuradio import eng_notation
 from gr_ais import *
 from gr_ais.ais_demod import *
-from gnuradio import uhd
+#from gnuradio import uhd
 from gnuradio import digital
 #from ais_parser import *
 from optparse import OptionParser
@@ -40,10 +40,20 @@ class my_top_block(gr.top_block):
 
 		if options.filename is not None:
 			self.u = gr.file_source(gr.sizeof_gr_complex, options.filename)
+		elif options.rtlsdr:
+			import osmosdr
+			self.u = osmosdr.source_c(options.args)
+			self.u.set_sample_rate(options.rate)
+                        self.u.set_freq_corr(options.error)
+			if not self.u.set_center_freq(162.0e6):
+				print "Failed to set frequency"
+			self.u.set_gain_mode(0)
+			if options.gain is None:
+				options.gain = 49
+			self.u.set_gain(options.gain)
 		else:
-			self.u = uhd.usrp_source(options.addr,
-									io_type=uhd.io_type.COMPLEX_FLOAT32,
-									num_channels=1)
+			from gnuradio import uhd
+			self.u = uhd.usrp_source(options.addr, io_type=uhd.io_type.COMPLEX_FLOAT32, num_channels=1)
 	
 			if options.subdev is not None:
 				self.u.set_subdev_spec(options.subdev, 0)
@@ -145,11 +155,15 @@ def main():
 	parser.add_option("-t", "--tcp", action="store_true", default=False,
 						help="Start a TCP server on port 9987 instead of outputting to stdout. Useful for gpsd.")
         parser.add_option("-V", "--verbose", type="int", default=1,
-                                                help="Verbosity level. 0=AIS ascii output only, 1=decode packets, >1 various debug levels [default=%default]")
+                                                help="Verbosity level. 0=AIS ascii output only, 1=decode packets, --verbose >1 various debug levels [default=%default]")
         parser.add_option("", "--lon", type="float", default=21.5593,
                                                 help="Your longitude in decimal degrees [default=%default]")
         parser.add_option("", "--lat", type="float", default=63.1587,
                                                 help="Your latitude in decimal degrees [default=%default]")
+	parser.add_option("-d", "--rtlsdr", action="store_true", default=False,
+						help="Use RTL-SDR dongle")
+	parser.add_option("-D", "--args", type="string", default="",
+						help="arguments to pass to UHD/RTL constructor")
 
 	(options, args) = parser.parse_args ()
 
