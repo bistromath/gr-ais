@@ -1,50 +1,33 @@
-/* -*- c++ -*- */
 /*
- * Copyright 2010 Free Software Foundation, Inc.
- * 
+ * Copyright 2011 Free Software Foundation, Inc.
+ *
  * This file is part of GNU Radio
- * 
+ *
  * GNU Radio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 3, or (at your option)
  * any later version.
- * 
+ *
  * GNU Radio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with GNU Radio; see the file COPYING.  If not, write to
  * the Free Software Foundation, Inc., 51 Franklin Street,
  * Boston, MA 02110-1301, USA.
  */
-#include <iostream>
-#include "aadvark.h"
 
-void Aadvark::print() {
-  std::cout << "aadvark is " << aadvarkness << "/10 aadvarky" << std::endl;
-}
+#ifndef INCLUDED_AIS_API_H
+#define INCLUDED_AIS_API_H
 
-Aadvark::Aadvark(int aaness): aadvarkness(aaness) {}
+#include <gnuradio/attributes.h>
 
-bool aadvarky_enough(Aadvark aad) {
-  if (aad.get_aadvarkness() > 6)
-    return true;
-  else
-    return false;
-}
+#ifdef gnuradio_ais_EXPORTS
+#  define AIS_API __GR_ATTR_EXPORT
+#else
+#  define AIS_API __GR_ATTR_IMPORT
+#endif
 
-int Aadvark::get_aadvarkness() {
-  return aadvarkness;
-}
-
-int main() {
-  Aadvark arold = Aadvark(6);
-  arold.print();
-  if (aadvarky_enough(arold))
-    std::cout << "He is aadvarky enough" << std::endl;
-  else
-    std::cout << "He is not aadvarky enough" << std::endl;
-}
-
+#endif /* INCLUDED_AIS_API_H */

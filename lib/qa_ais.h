@@ -1,5 +1,6 @@
+/* -*- c++ -*- */
 /*
- * Copyright 2011 Free Software Foundation, Inc.
+ * Copyright 2012 Free Software Foundation, Inc.
  *
  * This file is part of GNU Radio
  *
@@ -19,15 +20,19 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#ifndef INCLUDED_GR_AIS_API_H
-#define INCLUDED_GR_AIS_API_H
+#ifndef _QA_AIS_H_
+#define _QA_AIS_H_
 
-#include <gruel/attributes.h>
+#include <gnuradio/attributes.h>
+#include <cppunit/TestSuite.h>
 
-#ifdef gnuradio_gr_ais_EXPORTS
-#  define GR_AIS_API __GR_ATTR_EXPORT
-#else
-#  define GR_AIS_API __GR_ATTR_IMPORT
-#endif
+//! collect all the tests for the gr-filter directory
 
-#endif /* INCLUDED_GR_AIS_API_H */
+class __GR_ATTR_EXPORT qa_ais
+{
+ public:
+  //! return suite of tests for all of gr-filter directory
+  static CppUnit::TestSuite *suite();
+};
+
+#endif /* _QA_AIS_H_ */

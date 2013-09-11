@@ -10,13 +10,14 @@
 #second, there's no provision for phase estimation, so the combined trellis assumes each packet starts at phase=0.
 #sometimes it'll cope with this, but it loses a lot of packets
 
-from gnuradio import gr, blks2, filter
+from gnuradio import gr, filter
 from gnuradio import trellis
-from gnuradio import window
+from gnuradio.filter import window
 from gnuradio import digital
-import gr_ais_swig as ais
+from gnuradio import analog
 import fsm_utils
 import gmsk_sync
+import ais_swig as ais
 
 #from gmskenhanced import gmsk_demod
 #from gmskmod import gmsk_demod
@@ -89,21 +90,21 @@ class ais_demod(gr.hier_block2):
 			denom = gcd(data_rate*samples_per_symbol, samp_rate)
 			cr_interp = int(data_rate*samples_per_symbol/denom)
 			cr_decim = int(samp_rate/denom)
-			self.resample = blks2.rational_resampler_ccc(cr_interp, cr_decim)
+			self.resample = filter.rational_resampler_ccc(cr_interp, cr_decim)
 			#here we take a different tack and use A.A.'s CPM decomposition technique
-			self.clockrec = gr.clock_recovery_mm_cc(samples_per_symbol_clockrec, 0.005*0.005*0.25, 0.5, 0.005, 0.0005) #might have to futz with the max. deviation
+			self.clockrec = digital.clock_recovery_mm_cc(samples_per_symbol_clockrec, 0.005*0.005*0.25, 0.5, 0.005, 0.0005) #might have to futz with the max. deviation
 			(fsm, constellation, MF, N, f0T) = make_gmsk(samples_per_symbol_viterbi, BT) #calculate the decomposition required for demodulation
-			self.costas = gr.costas_loop_cc(0.015, 0.015*0.015*0.25, 100e-6, -100e-6, 4) #does fine freq/phase synchronization. should probably calc the coeffs instead of hardcode them.
-			self.streams2stream = gr.streams_to_stream(int(gr.sizeof_gr_complex*1), int(N))
+			self.costas = digital.costas_loop_cc(0.015, 0.015*0.015*0.25, 100e-6, -100e-6, 4) #does fine freq/phase synchronization. should probably calc the coeffs instead of hardcode them.
+			self.streams2stream = blocks.streams_to_stream(int(gr.sizeof_gr_complex*1), int(N))
 			self.mf0 = filter.fir_filter_ccc(samples_per_symbol_viterbi, MF[0].conjugate()) #two matched filters for decomposition
 			self.mf1 = filter.fir_filter_ccc(samples_per_symbol_viterbi, MF[1].conjugate())
-			self.fo = gr.sig_source_c(samples_per_symbol_viterbi, gr.GR_COS_WAVE, -f0T, 1, 0) #the memoryless modulation component of the decomposition
-			self.fomult = gr.multiply_cc(1)
+			self.fo = analog .sig_source_c(samples_per_symbol_viterbi, gr.GR_COS_WAVE, -f0T, 1, 0) #the memoryless modulation component of the decomposition
+			self.fomult = blocks.multiply_cc(1)
 			self.trellis = trellis.viterbi_combined_cb(fsm, int(data_rate), -1, -1, int(N), constellation, trellis.TRELLIS_EUCLIDEAN) #the actual Viterbi decoder
 
 		else:
 		#this is probably not optimal and someone who knows what they're doing should correct me
-			self.datafiltertaps = gr.firdes.root_raised_cosine(10, #gain
+			self.datafiltertaps = filter.firdes.root_raised_cosine(10, #gain
 													  self._samplerate*32, #sample rate
 													  self._bits_per_sec, #symbol rate
 													  0.4, #alpha, same as BT?
@@ -112,7 +113,7 @@ class ais_demod(gr.hier_block2):
 			self.datafilter = filter.fir_filter_fff(1, self.datafiltertaps)
 
 			sensitivity = (math.pi / 2) / self._samples_per_symbol
-			self.demod = gr.quadrature_demod_cf(sensitivity) #param is gain
+			self.demod = analog.quadrature_demod_cf(sensitivity) #param is gain
 
 			#self.clockrec = digital.clock_recovery_mm_ff(self._samples_per_symbol,0.25*self._gain_mu*self._gain_mu,self._mu,self._gain_mu,self._omega_relative_limit)
 			self.clockrec = digital.pfb_clock_sync_ccf(self._samples_per_symbol, 0.04, self.datafiltertaps, 32, 0, 1.15)
@@ -125,7 +126,7 @@ class ais_demod(gr.hier_block2):
 #										)
 
 #			self.delay = gr.delay(gr.sizeof_float, 64 + 16) #the correlator delays 64 bits, and the LMS delays some as well.
-			self.slicer = digital.digital.binary_slicer_fb()
+			self.slicer = digital.binary_slicer_fb()
 #			self.training_correlator = digital.correlate_access_code_bb("1100110011001100", 0)
 #			self.cma = digital.cma_equalizer_cc
 #just a note here: a complex combined quad demod/slicer could be based on if's rather than an actual quad demod, right?
