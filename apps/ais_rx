@@ -70,8 +70,6 @@ class my_top_block(gr.top_block):
         result = self.u.set_center_freq(freq)
         return True
 
-        return False
-
     def ais_rx(self, src, freq, designator, options, queue):
         self.rate = options.rate
         self.u = src
