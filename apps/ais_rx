@@ -46,6 +46,7 @@ class my_top_block(gr.top_block):
             if options.subdev is not None:
                 self.u.set_subdev_spec(options.subdev, 0)
             self.u.set_samp_rate(options.rate)
+            self._rate = self.u.get_samp_rate()
 
             self._freq_offset = options.error
             #print "Frequency offset is %i" % self._freq_offset
