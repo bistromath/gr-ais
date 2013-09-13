@@ -51,16 +51,15 @@ class ais_rx(gr.hier_block2):
 
         self._bits_per_sec = 9600.0
         self._samples_per_symbol = rate / self._filter_decimation / self._bits_per_sec
-        class options():
-            pass
-        options.viterbi = False
-        options.samples_per_symbol = self._samples_per_symbol
-        options.gain_mu = 0.3
-        options.mu=0.5
-        options.omega_relative_limit = 0.003
-        options.bits_per_sec = self._bits_per_sec
-        options.fftlen = 4096 #trades off accuracy of freq estimation in presence of noise, vs. delay time.
-        options.samp_rate = rate / self._filter_decimation
+        options = {}
+        options[ "viterbi" ] = False
+        options[ "samples_per_symbol" ] = self._samples_per_symbol
+        options[ "gain_mu" ] = 0.3
+        options[ "mu" ] = 0.5
+        options[ "omega_relative_limit" ] = 0.003
+        options[ "bits_per_sec" ] = self._bits_per_sec
+        options[ "fftlen" ] = 4096 #trades off accuracy of freq estimation in presence of noise, vs. delay time.
+        options[ "samp_rate" ] = rate / self._filter_decimation
         self.demod = ais.ais_demod(options) #ais_demod takes in complex baseband and spits out 1-bit packed bitstream
         self.unstuff = ais.unstuff() #undoes bit stuffing operation
         self.start_correlator = digital.correlate_access_code_tag_bb("1010101010101010", 0, "ais_preamble") #should mark start of packet
@@ -84,6 +83,7 @@ class ais_radio (gr.top_block, pubsub):
 
     self._u = self._setup_source(options)
     options.rate = self._rate = self.get_rate()
+    print "Rate is %i" % (options.rate,)
 
     self._rx_path1 = ais_rx(161.975e6 - 162.0e6, options.rate, "A", self._queue)
     self._rx_path2 = ais_rx(162.025e6 - 162.0e6, options.rate, "B", self._queue)
@@ -189,6 +189,7 @@ class ais_radio (gr.top_block, pubsub):
         import osmosdr
         src = osmosdr.source(options.args)
         src.set_sample_rate(options.rate)
+        src.get_samp_rate = src.get_sample_rate #alias for UHD compatibility
         if not src.set_center_freq(162.0e6 * (1 + options.error/1.e6)):
             print "Failed to set initial frequency"
         else:
@@ -212,7 +213,6 @@ class ais_radio (gr.top_block, pubsub):
         src = blocks.file_source(gr.sizeof_gr_complex, options.source)
         print "Using file source %s" % options.source
 
-    print "Rate is %i" % (options.rate,)
     return src
 
   def close(self):

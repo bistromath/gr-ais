@@ -61,13 +61,13 @@ class ais_demod(gr.hier_block2):
                                 gr.io_signature(1, 1, gr.sizeof_gr_complex), # Input signature
                                 gr.io_signature(1, 1, gr.sizeof_char)) # Output signature
 
-        self._samples_per_symbol = options.samples_per_symbol
-        self._bits_per_sec = options.bits_per_sec
+        self._samples_per_symbol = options[ "samples_per_symbol" ]
+        self._bits_per_sec = options[ "bits_per_sec" ]
         self._samplerate = self._samples_per_symbol * self._bits_per_sec
-        self._gain_mu = options.gain_mu
-        self._mu = options.mu
-        self._omega_relative_limit = options.omega_relative_limit
-        self.fftlen = options.fftlen
+        self._gain_mu = options[ "gain_mu" ]
+        self._mu = options[ "mu" ]
+        self._omega_relative_limit = options[ "omega_relative_limit" ]
+        self.fftlen = options[ "fftlen" ]
 
         #right now we are going to hardcode the different options for VA mode here. later on we can use configurable options
         samples_per_symbol_viterbi = 2
@@ -76,11 +76,11 @@ class ais_demod(gr.hier_block2):
         samples_per_symbol_clockrec = samples_per_symbol / bits_per_symbol
         BT = 0.4
         data_rate = 9600.0
-        samp_rate = options.samp_rate
+        samp_rate = options[ "samp_rate" ]
 
         self.gmsk_sync = gmsk_sync.square_and_fft_sync(self._samplerate, self._bits_per_sec, self.fftlen)
 
-        if(options.viterbi is True):
+        if(options[ "viterbi" ] is True):
             #calculate the required decimation and interpolation to achieve the desired samples per symbol
             denom = gcd(data_rate*samples_per_symbol, samp_rate)
             cr_interp = int(data_rate*samples_per_symbol/denom)
@@ -93,7 +93,7 @@ class ais_demod(gr.hier_block2):
             self.streams2stream = blocks.streams_to_stream(int(gr.sizeof_gr_complex*1), int(N))
             self.mf0 = filter.fir_filter_ccc(samples_per_symbol_viterbi, MF[0].conjugate()) #two matched filters for decomposition
             self.mf1 = filter.fir_filter_ccc(samples_per_symbol_viterbi, MF[1].conjugate())
-            self.fo = analog .sig_source_c(samples_per_symbol_viterbi, gr.GR_COS_WAVE, -f0T, 1, 0) #the memoryless modulation component of the decomposition
+            self.fo = analog.sig_source_c(samples_per_symbol_viterbi, gr.GR_COS_WAVE, -f0T, 1, 0) #the memoryless modulation component of the decomposition
             self.fomult = blocks.multiply_cc(1)
             self.trellis = trellis.viterbi_combined_cb(fsm, int(data_rate), -1, -1, int(N), constellation, trellis.TRELLIS_EUCLIDEAN) #the actual Viterbi decoder
 
@@ -113,31 +113,15 @@ class ais_demod(gr.hier_block2):
             #self.clockrec = digital.clock_recovery_mm_ff(self._samples_per_symbol,0.25*self._gain_mu*self._gain_mu,self._mu,self._gain_mu,self._omega_relative_limit)
             self.clockrec = digital.pfb_clock_sync_ccf(self._samples_per_symbol, 0.04, self.datafiltertaps, 32, 0, 1.15)
             self.tcslicer = digital.digital.binary_slicer_fb()
-#           self.dfe = digital.digital.lms_dd_equalizer_cc(
-#                                          32,
-#                                          0.005,
-#                                          1,
-#                                          digital.digital.constellation_bpsk()
-#                                       )
-
-#           self.delay = gr.delay(gr.sizeof_float, 64 + 16) #the correlator delays 64 bits, and the LMS delays some as well.
             self.slicer = digital.binary_slicer_fb()
-#           self.training_correlator = digital.correlate_access_code_bb("1100110011001100", 0)
-#           self.cma = digital.cma_equalizer_cc
-#just a note here: a complex combined quad demod/slicer could be based on if's rather than an actual quad demod, right?
-#in fact all the constellation decoders up to QPSK could operate on complex data w/o doing the whole atan thing
 
         self.diff = digital.diff_decoder_bb(2)
         self.invert = ais.invert() #NRZI signal diff decoded and inverted should give original signal
 
         self.connect(self, self.gmsk_sync)
 
-        if(options.viterbi is False):
+        if(options[ "viterbi" ] is False):
             self.connect(self.gmsk_sync, self.clockrec, self.demod, self.slicer, self.diff, self.invert, self)
-            #self.connect(self.gmsk_sync, self.demod, self.clockrec, self.tcslicer, self.training_correlator)
-            #self.connect(self.clockrec, self.delay, (self.dfe, 0))
-            #self.connect(self.training_correlator, (self.dfe, 1))
-            #self.connect(self.dfe, self.slicer, self.diff, self.invert, self)
 
         else:
             self.connect(self.gmsk_sync, self.costas, self.resample, self.clockrec)
