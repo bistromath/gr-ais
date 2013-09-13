@@ -15,16 +15,11 @@ from gnuradio import trellis
 from gnuradio.filter import window
 from gnuradio import digital
 from gnuradio import analog
-import fsm_utils
-import gmsk_sync
-import ais_swig as ais
-
-#from gmskenhanced import gmsk_demod
-#from gmskmod import gmsk_demod
-import numpy
-import scipy
-import scipy.stats
 import math
+#import scipy, numpy
+#import fsm_utils
+import ais
+import gmsk_sync
 
 #make_gmsk uses make_cpm_signals to create GMSK signals for a given samples per symbol and BT.
 #based on (copied from) Achilleas Anastasopoulos's test_cpm.py

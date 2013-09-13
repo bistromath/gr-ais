@@ -43,12 +43,10 @@ if _RTLD_GLOBAL != 0:
 
 # import swig generated symbols into the gr_ais namespace
 from ais_swig import *
-import fsm_utils
+#import fsm_utils
 import gmsk_sync
-import ais_demod
-
-# import any pure python here
-#
+from ais_demod import ais_demod
+import radio
 
 # ----------------------------------------------------------------
 # Tail of workaround

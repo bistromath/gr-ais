@@ -34,6 +34,7 @@ GR_PYTHON_INSTALL(
     gmsk_sync.py
     fsm_utils.py
     ais_demod.py
+    radio.py
     DESTINATION ${GR_PYTHON_DIR}/ais
 )
 
