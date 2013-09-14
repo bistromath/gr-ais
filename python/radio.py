@@ -30,6 +30,7 @@ from gnuradio.gr.pubsub import pubsub
 from optparse import OptionParser, OptionGroup
 import threading
 import time
+import sys
 import re
 import ais
 
@@ -82,7 +83,7 @@ class ais_radio (gr.top_block, pubsub):
     self._queue = gr.msg_queue()
 
     self._u = self._setup_source(options)
-    options.rate = self._rate = self.get_rate()
+    options.rate = self.get_rate()
     print "Rate is %i" % (options.rate,)
 
     self._rx_path1 = ais_rx(161.975e6 - 162.0e6, options.rate, "A", self._queue)
@@ -101,6 +102,7 @@ class ais_radio (gr.top_block, pubsub):
 
   def send(self, msg):
     print msg.to_string()
+    sys.stdout.flush()
 
   @staticmethod
   def add_radio_options(parser):
