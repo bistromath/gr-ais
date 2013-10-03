@@ -100,15 +100,17 @@ class ais_demod(gr.hier_block2):
         else:
         #this is probably not optimal and someone who knows what they're doing should correct me
             self.datafiltertaps = filter.firdes.root_raised_cosine(10, #gain
-                                                      self._samplerate*32, #sample rate
+                                                      self._samplerate*16, #sample rate
                                                       self._bits_per_sec, #symbol rate
                                                       0.4, #alpha, same as BT?
-                                                      50*32) #no. of taps
+                                                      50*16) #no. of taps
 
             sensitivity = (math.pi / 2) / self._samples_per_symbol
             self.demod = analog.quadrature_demod_cf(sensitivity) #param is gain
 
-            self.clockrec = digital.pfb_clock_sync_ccf(self._samples_per_symbol, 0.04, self.datafiltertaps, 32, 0, 1.15)
+            self.clockrec = digital.pfb_clock_sync_ccf(self._samples_per_symbol,
+                                                       0.04,
+                                                       self.datafiltertaps, 16, 0, 1.15)
             self.tcslicer = digital.digital.binary_slicer_fb()
             self.slicer = digital.binary_slicer_fb()
 

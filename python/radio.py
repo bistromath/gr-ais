@@ -44,7 +44,7 @@ class ais_rx(gr.hier_block2):
                                 gr.io_signature(0,0,0))
 
         self.coeffs = filter.firdes.low_pass(1, rate, 7000, 1000)
-        self._filter_decimation = 4 #fixed, TODO make settable via params or better yet do resampling
+        self._filter_decimation = 12 #fixed, TODO make settable via params or better yet do resampling
         self.filter = filter.freq_xlating_fir_filter_ccf(self._filter_decimation,
                                                      self.coeffs,
                                                      freq,
@@ -213,7 +213,7 @@ class ais_radio (gr.top_block, pubsub):
           ip, port = re.search("(.*)\:(\d{1,5})", options.source).groups()
         except:
           raise Exception("Please input UDP source e.g. 192.168.10.1:12345")
-        src = gr.udp_source(gr.sizeof_gr_complex, ip, int(port))
+        src = blocks.udp_source(gr.sizeof_gr_complex, ip, int(port))
         print "Using UDP source %s:%s" % (ip, port)
       else:
         src = blocks.file_source(gr.sizeof_gr_complex, options.source)
