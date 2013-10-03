@@ -37,14 +37,14 @@ import ais
 #hier block encapsulating all the signal processing after the source
 #could probably be split into its own file
 class ais_rx(gr.hier_block2):
-    def __init__(self, freq, rate, designator, queue):
+    def __init__(self, freq, rate, designator, queue, use_viterbi=False):
         gr.hier_block2.__init__(self,
                                 "ais_rx",
                                 gr.io_signature(1,1,gr.sizeof_gr_complex),
                                 gr.io_signature(0,0,0))
 
         self.coeffs = filter.firdes.low_pass(1, rate, 7000, 1000)
-        self._filter_decimation = 4 #fixed, TODO make settable via params
+        self._filter_decimation = 4 #fixed, TODO make settable via params or better yet do resampling
         self.filter = filter.freq_xlating_fir_filter_ccf(self._filter_decimation,
                                                      self.coeffs,
                                                      freq,
@@ -53,7 +53,7 @@ class ais_rx(gr.hier_block2):
         self._bits_per_sec = 9600.0
         self._samples_per_symbol = rate / self._filter_decimation / self._bits_per_sec
         options = {}
-        options[ "viterbi" ] = False
+        options[ "viterbi" ] = use_viterbi
         options[ "samples_per_symbol" ] = self._samples_per_symbol
         options[ "gain_mu" ] = 0.3
         options[ "mu" ] = 0.5
@@ -83,11 +83,11 @@ class ais_radio (gr.top_block, pubsub):
     self._queue = gr.msg_queue()
 
     self._u = self._setup_source(options)
-    options.rate = self.get_rate()
-    print "Rate is %i" % (options.rate,)
+    self._rate = self.get_rate()
+    print "Rate is %i" % (self._rate,)
 
-    self._rx_path1 = ais_rx(161.975e6 - 162.0e6, options.rate, "A", self._queue)
-    self._rx_path2 = ais_rx(162.025e6 - 162.0e6, options.rate, "B", self._queue)
+    self._rx_path1 = ais_rx(161.975e6 - 162.0e6, options.rate, "A", self._queue, options.viterbi)
+    self._rx_path2 = ais_rx(162.025e6 - 162.0e6, options.rate, "B", self._queue, options.viterbi)
     self.connect(self._u, self._rx_path1)
     self.connect(self._u, self._rx_path2)
 
@@ -127,6 +127,9 @@ class ais_radio (gr.top_block, pubsub):
     group.add_option("-r", "--rate", type="eng_float", default=250e3,
                       help="set sample rate [default=%default]")
 
+    group.add_option("-v", "--viterbi", action="store_true", default=False,
+                     help="Use experimental Viterbi-based GMSK demodulator [default=%default]")
+
     parser.add_option_group(group)
 
   def live_source(self):
@@ -141,7 +144,7 @@ class ais_radio (gr.top_block, pubsub):
   def set_rate(self, rate):
     self._rx_path1.set_rate(rate)
     self._rx_path2.set_rate(rate)
-    return self._u.set_rate(rate) if self.live_source() else 0
+    return self._u.set_rate(rate) if self.live_source() else self._rate
 
   def set_threshold(self, threshold):
     self._rx_path.set_threshold(threshold)
@@ -204,6 +207,7 @@ class ais_radio (gr.top_block, pubsub):
 
     else:
       #semantically detect whether it's ip.ip.ip.ip:port or filename
+      self._rate = options.rate
       if ':' in options.source:
         try:
           ip, port = re.search("(.*)\:(\d{1,5})", options.source).groups()

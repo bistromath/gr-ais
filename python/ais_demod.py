@@ -16,7 +16,7 @@ from gnuradio.filter import window
 from gnuradio import digital
 from gnuradio import analog
 import math
-#import scipy, numpy
+#import scipy.special, numpy
 #import fsm_utils
 import ais
 import gmsk_sync
@@ -38,7 +38,7 @@ def make_gmsk(samples_per_symbol, BT):
     fsm = trellis.fsm(P, M, L)
 
     tt=numpy.arange(0,L*Q)/(1.0*Q)-L/2.0
-    p=(0.5*scipy.stats.erfc(2*math.pi*BT*(tt-0.5)/math.sqrt(math.log(2.0))/math.sqrt(2.0))-0.5*scipy.stats.erfc(2*math.pi*BT*(tt+0.5)/math.sqrt(math.log(2.0))/math.sqrt(2.0)))/2.0
+    p=(0.5*scipy.special.erfc(2*math.pi*BT*(tt-0.5)/math.sqrt(math.log(2.0))/math.sqrt(2.0))-0.5*scipy.special.erfc(2*math.pi*BT*(tt+0.5)/math.sqrt(math.log(2.0))/math.sqrt(2.0)))/2.0
     p=p/sum(p)*Q/2.0
     q=numpy.cumsum(p)/Q
     q=q/q[-1]/2.0
@@ -105,12 +105,9 @@ class ais_demod(gr.hier_block2):
                                                       0.4, #alpha, same as BT?
                                                       50*32) #no. of taps
 
-            self.datafilter = filter.fir_filter_fff(1, self.datafiltertaps)
-
             sensitivity = (math.pi / 2) / self._samples_per_symbol
             self.demod = analog.quadrature_demod_cf(sensitivity) #param is gain
 
-            #self.clockrec = digital.clock_recovery_mm_ff(self._samples_per_symbol,0.25*self._gain_mu*self._gain_mu,self._mu,self._gain_mu,self._omega_relative_limit)
             self.clockrec = digital.pfb_clock_sync_ccf(self._samples_per_symbol, 0.04, self.datafiltertaps, 32, 0, 1.15)
             self.tcslicer = digital.digital.binary_slicer_fb()
             self.slicer = digital.binary_slicer_fb()
