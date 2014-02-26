@@ -21,5 +21,6 @@ install(FILES
     ais_freqest.xml
     ais_invert.xml
     ais_parse.xml
-    ais_unstuff.xml DESTINATION share/gnuradio/grc/blocks
+    ais_unstuff.xml 
+    ais_freq_sync.xml DESTINATION share/gnuradio/grc/blocks
 )

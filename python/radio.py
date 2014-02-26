@@ -44,7 +44,7 @@ class ais_rx(gr.hier_block2):
                                 gr.io_signature(0,0,0))
 
         self.coeffs = filter.firdes.low_pass(1, rate, 7000, 1000)
-        self._filter_decimation = 12 #fixed, TODO make settable via params or better yet do resampling
+        self._filter_decimation = 2 #fixed, TODO make settable via params or better yet do resampling
         self.filter = filter.freq_xlating_fir_filter_ccf(self._filter_decimation,
                                                      self.coeffs,
                                                      freq,
@@ -86,10 +86,13 @@ class ais_radio (gr.top_block, pubsub):
     self._rate = self.get_rate()
     print "Rate is %i" % (self._rate,)
 
-    self._rx_path1 = ais_rx(161.975e6 - 162.0e6, options.rate, "A", self._queue, options.viterbi)
-    self._rx_path2 = ais_rx(162.025e6 - 162.0e6, options.rate, "B", self._queue, options.viterbi)
-    self.connect(self._u, self._rx_path1)
-    self.connect(self._u, self._rx_path2)
+    if options.singlechannel is True:
+        self._rx_paths = (ais_rx(0, options.rate, "A", self._queue, options.viterbi),)
+    else:
+        self._rx_paths = (ais_rx(161.975e6 - 162.0e6, options.rate, "A", self._queue, options.viterbi),
+                          ais_rx(162.025e6 - 162.0e6, options.rate, "B", self._queue, options.viterbi))
+    for rx_path in self._rx_paths:
+        self.connect(self._u, rx_path)
 
     #now subscribe to set various options via pubsub
     self.subscribe("gain", self.set_gain)
@@ -129,6 +132,8 @@ class ais_radio (gr.top_block, pubsub):
 
     group.add_option("-v", "--viterbi", action="store_true", default=False,
                      help="Use experimental Viterbi-based GMSK demodulator [default=%default]")
+    group.add_option("-S", "--singlechannel", action="store_true", default=False,
+                     help="Use only a single channel instead of looking at both A & B [default=%default]")
 
     parser.add_option_group(group)
 
@@ -142,12 +147,13 @@ class ais_radio (gr.top_block, pubsub):
     return self.get_gain()
 
   def set_rate(self, rate):
-    self._rx_path1.set_rate(rate)
-    self._rx_path2.set_rate(rate)
+    for rx_path in self._rx_paths:
+        rx_path1.set_rate(rate)
     return self._u.set_rate(rate) if self.live_source() else self._rate
 
   def set_threshold(self, threshold):
-    self._rx_path.set_threshold(threshold)
+    for rx_path in self._rx_paths:
+        rx_path.set_threshold(threshold)
 
   def get_gain(self):
     return self._u.get_gain() if self.live_source() else 0

@@ -8,7 +8,7 @@ from gnuradio import fft
 from gnuradio import blocks
 from gnuradio import analog
 from math import pi
-import ais_swig as ais
+import ais
 
 
 class square_and_fft_sync(gr.hier_block2):
