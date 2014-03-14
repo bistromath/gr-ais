@@ -29,7 +29,7 @@
 #include <sstream>
 #include <iomanip>
 
-#define VERBOSE 0
+#define VERBOSE 1
 
 namespace gr {
   namespace ais {
@@ -71,38 +71,27 @@ namespace gr {
         int size = noutput_items - 500; //we need to be able to look at least this far forward
         if(size <= 0) return 0;
 
-        //look ma, no state machine
-        //instead of iterating through in[] looking for things, we'll just pull up all the start/stop tags and use those to look for packets
-        std::vector<gr::tag_t> preamble_tags, start_tags, end_tags;
+        std::vector<gr::tag_t> frame_tags;
         uint64_t abs_sample_cnt = nitems_read(0);
-        get_tags_in_range(preamble_tags, 0, abs_sample_cnt, abs_sample_cnt + size, pmt::string_to_symbol("ais_preamble"));
-        if(preamble_tags.size() == 0) return size; //sad trombone
 
-        //look for start & end tags within a reasonable range
-        uint64_t preamble_mark = preamble_tags[0].offset;
-        if(VERBOSE) std::cout << "Found a preamble at " << preamble_mark << std::endl;
-
-        //now look for a start tag within reasonable range of the preamble
-        get_tags_in_range(start_tags, 0, preamble_mark, preamble_mark + 30, pmt::string_to_symbol("ais_frame"));
-        if(start_tags.size() == 0) return preamble_mark + 30 - abs_sample_cnt; //nothing here, move on (should update d_num_startlost)
-        uint64_t start_mark = start_tags[0].offset;
-        if(VERBOSE) std::cout << "Found a start tag at " << start_mark << std::endl;
-
-        //now look for an end tag within reasonable range of the preamble
-        get_tags_in_range(end_tags, 0, start_mark + 184, start_mark + 450, pmt::string_to_symbol("ais_frame"));
-        if(end_tags.size() == 0) return preamble_mark + 450 - abs_sample_cnt; //should update d_num_stoplost
-        uint64_t end_mark = end_tags[0].offset;
-        if(VERBOSE) std::cout << "Found an end tag at " << end_mark << std::endl;
+        get_tags_in_range(frame_tags, 0, abs_sample_cnt, abs_sample_cnt + size, pmt::string_to_symbol("ais_frame"));
+        if(frame_tags.size() == 0) return size; //nothing here, move on (should update d_num_startlost)
+        if(frame_tags.size() == 1) {
+            std::cout << "Found only one tag at " << frame_tags[1].offset << std::endl; 
+            return frame_tags[0].offset - abs_sample_cnt - 1;
+        }
+        int32_t pktlen = frame_tags[1].offset - frame_tags[0].offset - 8; //don't count end tag
+        if(pktlen <= 0) return frame_tags[1].offset - abs_sample_cnt - 1;
+        if(VERBOSE) std::cout << "Found packet with length " << pktlen << " starting at " << frame_tags[0].offset << std::endl;
+        //look for pktlen here
+        if((pktlen != 440) && (pktlen != 168)) return frame_tags[1].offset - abs_sample_cnt - 1;
 
         //now we've got a valid, framed packet
-        uint64_t datalen = end_mark - start_mark - 8; //includes CRC, discounts end of frame marker
-        if(VERBOSE) std::cout << "Found packet with length " << datalen << std::endl;
-        char *pkt = new char[datalen];
-
-        memcpy(pkt, &in[start_mark-abs_sample_cnt], datalen);
-        parse_data(pkt, datalen);
+        char *pkt = new char[pktlen];
+        memcpy(pkt, &in[frame_tags[0].offset-abs_sample_cnt], pktlen);
+        parse_data(pkt, pktlen);
         delete(pkt);
-        return end_mark - abs_sample_cnt;
+        return frame_tags[1].offset - abs_sample_cnt;
     }
 
     unsigned long unpack(char *buffer, int start, int length)

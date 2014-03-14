@@ -25,6 +25,7 @@
 
 from gnuradio import gr, gru, eng_notation, filter, blocks, digital
 from gnuradio.filter import optfir
+from gnuradio.filter import pfb
 from gnuradio.eng_option import eng_option
 from gnuradio.gr.pubsub import pubsub
 from optparse import OptionParser, OptionGroup
@@ -43,36 +44,33 @@ class ais_rx(gr.hier_block2):
                                 gr.io_signature(1,1,gr.sizeof_gr_complex),
                                 gr.io_signature(0,0,0))
 
-        self.coeffs = filter.firdes.low_pass(1, rate, 7000, 1000)
-        self._filter_decimation = 2 #fixed, TODO make settable via params or better yet do resampling
-        self.filter = filter.freq_xlating_fir_filter_ccf(self._filter_decimation,
-                                                     self.coeffs,
-                                                     freq,
-                                                     rate)
-
+#        self.coeffs = filter.firdes.low_pass(1, rate, 7000, 1000)
+#        self._filter_decimation = 4 #fixed, TODO make settable via params or better yet do resampling
+#        self.filter = filter.freq_xlating_fir_filter_ccf(self._filter_decimation,
+#                                                     self.coeffs,
+#                                                     freq,
+#                                                     rate)
         self._bits_per_sec = 9600.0
-        self._samples_per_symbol = rate / self._filter_decimation / self._bits_per_sec
+        self._samples_per_symbol = 5
+        self.filter = pfb.arb_resampler_ccf(self._bits_per_sec*self._samples_per_symbol / rate)
         options = {}
         options[ "viterbi" ] = use_viterbi
         options[ "samples_per_symbol" ] = self._samples_per_symbol
         options[ "gain_mu" ] = 0.3
-        options[ "mu" ] = 0.5
-        options[ "omega_relative_limit" ] = 0.003
+        options[ "omega_relative_limit" ] = 0.01
         options[ "bits_per_sec" ] = self._bits_per_sec
-        options[ "fftlen" ] = 4096 #trades off accuracy of freq estimation in presence of noise, vs. delay time.
-        options[ "samp_rate" ] = rate / self._filter_decimation
+        options[ "fftlen" ] = 256 #trades off accuracy of freq estimation in presence of noise, vs. delay time.
+        options[ "samp_rate" ] = self._bits_per_sec * self._samples_per_symbol
         self.demod = ais.ais_demod(options) #ais_demod takes in complex baseband and spits out 1-bit packed bitstream
         self.unstuff = ais.unstuff() #undoes bit stuffing operation
-        self.start_correlator = digital.correlate_access_code_tag_bb("1010101010101010", 0, "ais_preamble") #should mark start of packet
-        self.stop_correlator = digital.correlate_access_code_tag_bb("01111110", 0, "ais_frame") #should mark start and end of packet
+        self.frame_correlator = digital.correlate_access_code_tag_bb("01111110", 0, "ais_frame") #should mark start and end of packet
         self.parse = ais.parse(queue, designator) #ais_parse.cc, calculates CRC, parses data into NMEA AIVDM message, moves data onto queue
 
         self.connect(self,
                      self.filter,
                      self.demod,
+                     self.frame_correlator,
                      self.unstuff,
-                     self.start_correlator,
-                     self.stop_correlator,
                      self.parse) #parse posts messages to the queue, which the main loop reads and prints
 
 class ais_radio (gr.top_block, pubsub):

@@ -24,12 +24,11 @@ include(GrPlatform) #define LIB_SUFFIX
 
 include_directories(${Boost_INCLUDE_DIR})
 link_directories(${Boost_LIBRARY_DIRS})
-
 list(APPEND ais_sources
     freqest_impl.cc
     invert_impl.cc
     parse_impl.cc
-    unstuff_impl.cc
+    hdlc_deframer_impl.cc
 )
 
 add_library(gnuradio-ais SHARED ${ais_sources})

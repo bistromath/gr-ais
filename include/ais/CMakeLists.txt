@@ -25,5 +25,5 @@ install(FILES
     freqest.h
     invert.h
     parse.h
-    unstuff.h DESTINATION include/ais
+    hdlc_deframer.h DESTINATION include/ais
 )

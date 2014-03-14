@@ -1,6 +1,6 @@
 /* -*- c++ -*- */
 /* 
- * Copyright 2013 <+YOU OR YOUR COMPANY+>.
+ * Copyright 2014 <+YOU OR YOUR COMPANY+>.
  * 
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,11 +19,11 @@
  */
 
 
-#ifndef INCLUDED_AIS_UNSTUFF_H
-#define INCLUDED_AIS_UNSTUFF_H
+#ifndef INCLUDED_AIS_HDLC_DEFRAMER_H
+#define INCLUDED_AIS_HDLC_DEFRAMER_H
 
 #include <ais/api.h>
-#include <gnuradio/block.h>
+#include <gnuradio/sync_block.h>
 
 namespace gr {
   namespace ais {
@@ -33,24 +33,24 @@ namespace gr {
      * \ingroup ais
      *
      */
-    class AIS_API unstuff : virtual public gr::block
+    class AIS_API hdlc_deframer : virtual public gr::sync_block
     {
      public:
-      typedef boost::shared_ptr<unstuff> sptr;
+      typedef boost::shared_ptr<hdlc_deframer> sptr;
 
       /*!
-       * \brief Return a shared_ptr to a new instance of ais::unstuff.
+       * \brief Return a shared_ptr to a new instance of ais::hdlc_deframer.
        *
-       * To avoid accidental use of raw pointers, ais::unstuff's
+       * To avoid accidental use of raw pointers, ais::hdlc_deframer's
        * constructor is in a private implementation
-       * class. ais::unstuff::make is the public interface for
+       * class. ais::hdlc_deframer::make is the public interface for
        * creating new instances.
        */
-      static sptr make();
+      static sptr make(const std::string frame_tag_name);
     };
 
   } // namespace ais
 } // namespace gr
 
-#endif /* INCLUDED_AIS_UNSTUFF_H */
+#endif /* INCLUDED_AIS_HDLC_DEFRAMER_H */
 

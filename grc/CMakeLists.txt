@@ -16,11 +16,11 @@
 # along with GNU Radio; see the file COPYING.  If not, write to
 # the Free Software Foundation, Inc., 51 Franklin Street,
 # Boston, MA 02110-1301, USA.
-
 install(FILES
     ais_freqest.xml
     ais_invert.xml
     ais_parse.xml
-    ais_unstuff.xml 
-    ais_freq_sync.xml DESTINATION share/gnuradio/grc/blocks
+    ais_freq_sync.xml 
+    ais_square_and_fft_sync_cc.xml
+    ais_hdlc_deframer.xml DESTINATION share/gnuradio/grc/blocks
 )

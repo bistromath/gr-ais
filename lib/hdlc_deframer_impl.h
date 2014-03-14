@@ -1,6 +1,6 @@
 /* -*- c++ -*- */
 /* 
- * Copyright 2013 <+YOU OR YOUR COMPANY+>.
+ * Copyright 2014 <+YOU OR YOUR COMPANY+>.
  * 
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,34 +18,31 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#ifndef INCLUDED_AIS_UNSTUFF_IMPL_H
-#define INCLUDED_AIS_UNSTUFF_IMPL_H
+#ifndef INCLUDED_AIS_HDLC_DEFRAMER_IMPL_H
+#define INCLUDED_AIS_HDLC_DEFRAMER_IMPL_H
 
-#include <ais/unstuff.h>
+#include <ais/hdlc_deframer.h>
 
 namespace gr {
   namespace ais {
 
-    class unstuff_impl : public unstuff
+    class hdlc_deframer_impl : public hdlc_deframer
     {
      private:
+        std::string d_frame_tag_name;
 
-     int d_consecutive;
      public:
-      unstuff_impl();
-      ~unstuff_impl();
+      hdlc_deframer_impl(const std::string frame_tag_name);
+      ~hdlc_deframer_impl();
 
       // Where all the action really happens
-      void forecast (int noutput_items, gr_vector_int &ninput_items_required);
-
-      int general_work(int noutput_items,
-		       gr_vector_int &ninput_items,
-		       gr_vector_const_void_star &input_items,
-		       gr_vector_void_star &output_items);
+      int work(int noutput_items,
+	       gr_vector_const_void_star &input_items,
+	       gr_vector_void_star &output_items);
     };
 
   } // namespace ais
 } // namespace gr
 
-#endif /* INCLUDED_AIS_UNSTUFF_IMPL_H */
+#endif /* INCLUDED_AIS_HDLC_DEFRAMER_IMPL_H */
 

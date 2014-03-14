@@ -11,7 +11,7 @@
 #include "ais/freqest.h"
 #include "ais/invert.h"
 #include "ais/parse.h"
-#include "ais/unstuff.h"
+#include "ais/hdlc_deframer.h"
 %}
 
 
@@ -21,5 +21,6 @@ GR_SWIG_BLOCK_MAGIC2(ais, freqest);
 GR_SWIG_BLOCK_MAGIC2(ais, invert);
 %include "ais/parse.h"
 GR_SWIG_BLOCK_MAGIC2(ais, parse);
-%include "ais/unstuff.h"
-GR_SWIG_BLOCK_MAGIC2(ais, unstuff);
+
+%include "ais/hdlc_deframer.h"
+GR_SWIG_BLOCK_MAGIC2(ais, hdlc_deframer);
