@@ -134,8 +134,9 @@ namespace gr {
 
         if(crc == calc_crc) {
             //publish
+            //TODO manage padding
             pmt::pmt_t pdu(pmt::cons(pmt::PMT_NIL,
-                                     pmt::init_u8vector(pkt_bytes.size(), pkt_bytes)));
+                                     pmt::make_blob(&pkt_bytes[0], pkt_bytes.size())));
             message_port_pub(pmt::mp("out"), pdu);
         }
 

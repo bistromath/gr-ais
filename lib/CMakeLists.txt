@@ -29,6 +29,7 @@ list(APPEND ais_sources
     invert_impl.cc
     parse_impl.cc
     hdlc_deframer_impl.cc
+    pdu_to_nmea_impl.cc
 )
 
 add_library(gnuradio-ais SHARED ${ais_sources})

@@ -12,6 +12,7 @@
 #include "ais/invert.h"
 #include "ais/parse.h"
 #include "ais/hdlc_deframer.h"
+#include "ais/pdu_to_nmea.h"
 %}
 
 
@@ -24,3 +25,5 @@ GR_SWIG_BLOCK_MAGIC2(ais, parse);
 
 %include "ais/hdlc_deframer.h"
 GR_SWIG_BLOCK_MAGIC2(ais, hdlc_deframer);
+%include "ais/pdu_to_nmea.h"
+GR_SWIG_BLOCK_MAGIC2(ais, pdu_to_nmea);

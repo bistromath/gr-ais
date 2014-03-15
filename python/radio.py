@@ -56,22 +56,24 @@ class ais_rx(gr.hier_block2):
         options = {}
         options[ "viterbi" ] = use_viterbi
         options[ "samples_per_symbol" ] = self._samples_per_symbol
-        options[ "gain_mu" ] = 0.3
+        options[ "gain_mu" ] = 0.2
         options[ "omega_relative_limit" ] = 0.01
         options[ "bits_per_sec" ] = self._bits_per_sec
         options[ "fftlen" ] = 256 #trades off accuracy of freq estimation in presence of noise, vs. delay time.
         options[ "samp_rate" ] = self._bits_per_sec * self._samples_per_symbol
-        self.demod = ais.ais_demod(options) #ais_demod takes in complex baseband and spits out 1-bit packed bitstream
-        self.unstuff = ais.unstuff() #undoes bit stuffing operation
+        self.demod = ais.ais_demod(options) #ais_demod takes in complex baseband and spits out 1-bit unpacked bitstream
         self.frame_correlator = digital.correlate_access_code_tag_bb("01111110", 0, "ais_frame") #should mark start and end of packet
-        self.parse = ais.parse(queue, designator) #ais_parse.cc, calculates CRC, parses data into NMEA AIVDM message, moves data onto queue
+        self.deframer = ais.hdlc_deframer("ais_frame") #takes bytes, deframes, unstuffs, CRCs, and emits PDUs with frame contents
+        self.nmea = ais.nmea_framer(designator) #turns data PDUs into NMEA sentences
+#        self.msgq = ais.pdu_to_msgq(queue) #posts PDUs to message queue for main program to parse at will
+#        self.parse = ais.parse(queue, designator) #ais_parse.cc, calculates CRC, parses data into NMEA AIVDM message, moves data onto queue
 
         self.connect(self,
                      self.filter,
                      self.demod,
                      self.frame_correlator,
-                     self.unstuff,
-                     self.parse) #parse posts messages to the queue, which the main loop reads and prints
+                     self.deframer,
+                     self.nmea)
 
 class ais_radio (gr.top_block, pubsub):
   def __init__(self, options):
