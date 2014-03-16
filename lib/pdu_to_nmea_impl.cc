@@ -100,9 +100,12 @@ namespace gr {
         int frag_offset = 0;
         std::string ret;
         const int nmea_max=56; //minus overhead from sentence structure
-        while(frag_offset < ascii.length()) {
+        const int num_frags = 1+((ascii.length()-1) / nmea_max);
+        while(frag_id <= num_frags) {
             if(frag_id > 1) ret += "\n";
-            std::string this_sentence =  "!AIVDM,1,"
+            std::string this_sentence =  "!AIVDM,"
+                                         + boost::to_string(num_frags)
+                                         + ","
                                          + boost::to_string(frag_id++)
                                          + ",,"
                                          + d_designator
