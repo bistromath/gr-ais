@@ -22,6 +22,5 @@ install(FILES
     ais_parse.xml
     ais_freq_sync.xml 
     ais_square_and_fft_sync_cc.xml
-    ais_hdlc_deframer.xml
     ais_pdu_to_nmea.xml DESTINATION share/gnuradio/grc/blocks
 )

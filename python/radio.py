@@ -63,7 +63,7 @@ class ais_rx(gr.hier_block2):
         options[ "samp_rate" ] = self._bits_per_sec * self._samples_per_symbol
         self.demod = ais.ais_demod(options) #ais_demod takes in complex baseband and spits out 1-bit unpacked bitstream
         self.frame_correlator = digital.correlate_access_code_tag_bb("01111110", 0, "ais_frame") #should mark start and end of packet
-        self.deframer = ais.hdlc_deframer("ais_frame") #takes bytes, deframes, unstuffs, CRCs, and emits PDUs with frame contents
+        self.deframer = digital.hdlc_deframer("ais_frame") #takes bytes, deframes, unstuffs, CRCs, and emits PDUs with frame contents
         self.nmea = ais.nmea_framer(designator) #turns data PDUs into NMEA sentences
 #        self.msgq = ais.pdu_to_msgq(queue) #posts PDUs to message queue for main program to parse at will
 #        self.parse = ais.parse(queue, designator) #ais_parse.cc, calculates CRC, parses data into NMEA AIVDM message, moves data onto queue

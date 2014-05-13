@@ -25,6 +25,5 @@ install(FILES
     freqest.h
     invert.h
     parse.h
-    hdlc_deframer.h
     pdu_to_nmea.h DESTINATION include/ais
 )
