@@ -38,33 +38,32 @@ import ais
 #hier block encapsulating all the signal processing after the source
 #could probably be split into its own file
 class ais_rx(gr.hier_block2):
-    def __init__(self, freq, rate, designator, queue, use_viterbi=False):
+    def __init__(self, freq, rate, designator):
         gr.hier_block2.__init__(self,
                                 "ais_rx",
                                 gr.io_signature(1,1,gr.sizeof_gr_complex),
                                 gr.io_signature(0,0,0))
 
-#        self.coeffs = filter.firdes.low_pass(1, rate, 7000, 1000)
-#        self._filter_decimation = 4 #fixed, TODO make settable via params or better yet do resampling
-#        self.filter = filter.freq_xlating_fir_filter_ccf(self._filter_decimation,
-#                                                     self.coeffs,
-#                                                     freq,
-#                                                     rate)
         self._bits_per_sec = 9600.0
         self._samples_per_symbol = 5
-        self.filter = pfb.arb_resampler_ccf(self._bits_per_sec*self._samples_per_symbol / rate)
+        self.coeffs = filter.firdes.low_pass(1, rate, 9000, 1000)
+        self._filter_decimation = int(rate/(self._bits_per_sec*self._samples_per_symbol))
+        self.filter = filter.freq_xlating_fir_filter_ccf(self._filter_decimation,
+                                                     self.coeffs,
+                                                     freq,
+                                                     rate)
+#        self.resamp = pfb.arb_resampler_ccf((self._bits_per_sec*self._samples_per_symbol)/int(rate/self._filter_decimation))
         options = {}
-        options[ "viterbi" ] = use_viterbi
-        options[ "samples_per_symbol" ] = self._samples_per_symbol
-        options[ "gain_mu" ] = 0.2
+        options[ "samples_per_symbol" ] = (rate/self._filter_decimation)/self._bits_per_sec
+        options[ "clockrec_gain" ] = 0.04
         options[ "omega_relative_limit" ] = 0.01
         options[ "bits_per_sec" ] = self._bits_per_sec
         options[ "fftlen" ] = 256 #trades off accuracy of freq estimation in presence of noise, vs. delay time.
         options[ "samp_rate" ] = self._bits_per_sec * self._samples_per_symbol
         self.demod = ais.ais_demod(options) #ais_demod takes in complex baseband and spits out 1-bit unpacked bitstream
         self.frame_correlator = digital.correlate_access_code_tag_bb("01111110", 0, "ais_frame") #should mark start and end of packet
-        self.deframer = digital.hdlc_deframer("ais_frame") #takes bytes, deframes, unstuffs, CRCs, and emits PDUs with frame contents
-        self.nmea = ais.nmea_framer(designator) #turns data PDUs into NMEA sentences
+        self.deframer = digital.hdlc_deframer_bp(11,64) #takes bytes, deframes, unstuffs, CRCs, and emits PDUs with frame contents
+        self.nmea = ais.pdu_to_nmea(designator) #turns data PDUs into NMEA sentences
 #        self.msgq = ais.pdu_to_msgq(queue) #posts PDUs to message queue for main program to parse at will
 #        self.parse = ais.parse(queue, designator) #ais_parse.cc, calculates CRC, parses data into NMEA AIVDM message, moves data onto queue
 
@@ -72,25 +71,24 @@ class ais_rx(gr.hier_block2):
                      self.filter,
                      self.demod,
                      self.frame_correlator,
-                     self.deframer,
-                     self.nmea)
+                     self.deframer)
+        self.msg_connect(self.deframer, "out", self.nmea, "print")
 
 class ais_radio (gr.top_block, pubsub):
   def __init__(self, options):
     gr.top_block.__init__(self)
     pubsub.__init__(self)
     self._options = options
-    self._queue = gr.msg_queue()
 
     self._u = self._setup_source(options)
     self._rate = self.get_rate()
     print "Rate is %i" % (self._rate,)
 
     if options.singlechannel is True:
-        self._rx_paths = (ais_rx(0, options.rate, "A", self._queue, options.viterbi),)
+        self._rx_paths = (ais_rx(0, options.rate, "A"),)
     else:
-        self._rx_paths = (ais_rx(161.975e6 - 162.0e6, options.rate, "A", self._queue, options.viterbi),
-                          ais_rx(162.025e6 - 162.0e6, options.rate, "B", self._queue, options.viterbi))
+        self._rx_paths = (ais_rx(161.975e6 - 162.0e6, options.rate, "A"),
+                          ais_rx(162.025e6 - 162.0e6, options.rate, "B"))
     for rx_path in self._rx_paths:
         self.connect(self._u, rx_path)
 
@@ -100,12 +98,6 @@ class ais_radio (gr.top_block, pubsub):
 
     self.publish("gain", self.get_gain)
     self.publish("rate", self.get_rate)
-
-    self._async_sender = gru.msgq_runner(self._queue, self.send)
-
-  def send(self, msg):
-    print msg.to_string()
-    sys.stdout.flush()
 
   @staticmethod
   def add_radio_options(parser):
@@ -129,9 +121,6 @@ class ais_radio (gr.top_block, pubsub):
     #RX path args
     group.add_option("-r", "--rate", type="eng_float", default=250e3,
                       help="set sample rate [default=%default]")
-
-    group.add_option("-v", "--viterbi", action="store_true", default=False,
-                     help="Use experimental Viterbi-based GMSK demodulator [default=%default]")
     group.add_option("-S", "--singlechannel", action="store_true", default=False,
                      help="Use only a single channel instead of looking at both A & B [default=%default]")
 
