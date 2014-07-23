@@ -46,7 +46,7 @@ class ais_rx(gr.hier_block2):
 
         self._bits_per_sec = 9600.0
         self._samples_per_symbol = 5
-        self.coeffs = filter.firdes.low_pass(1, rate, 9000, 1000)
+        self.coeffs = filter.firdes.low_pass(1, rate, 11000, 1000)
         self._filter_decimation = int(rate/(self._bits_per_sec*self._samples_per_symbol))
         self.filter = filter.freq_xlating_fir_filter_ccf(self._filter_decimation,
                                                      self.coeffs,
@@ -58,10 +58,9 @@ class ais_rx(gr.hier_block2):
         options[ "clockrec_gain" ] = 0.04
         options[ "omega_relative_limit" ] = 0.01
         options[ "bits_per_sec" ] = self._bits_per_sec
-        options[ "fftlen" ] = 256 #trades off accuracy of freq estimation in presence of noise, vs. delay time.
+        options[ "fftlen" ] = 1024 #trades off accuracy of freq estimation in presence of noise, vs. delay time.
         options[ "samp_rate" ] = self._bits_per_sec * self._samples_per_symbol
         self.demod = ais.ais_demod(options) #ais_demod takes in complex baseband and spits out 1-bit unpacked bitstream
-        self.frame_correlator = digital.correlate_access_code_tag_bb("01111110", 0, "ais_frame") #should mark start and end of packet
         self.deframer = digital.hdlc_deframer_bp(11,64) #takes bytes, deframes, unstuffs, CRCs, and emits PDUs with frame contents
         self.nmea = ais.pdu_to_nmea(designator) #turns data PDUs into NMEA sentences
 #        self.msgq = ais.pdu_to_msgq(queue) #posts PDUs to message queue for main program to parse at will
@@ -70,7 +69,6 @@ class ais_rx(gr.hier_block2):
         self.connect(self,
                      self.filter,
                      self.demod,
-                     self.frame_correlator,
                      self.deframer)
         self.msg_connect(self.deframer, "out", self.nmea, "print")
 

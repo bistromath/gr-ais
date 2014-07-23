@@ -11,9 +11,9 @@ from math import pi
 import ais
 
 
-class square_and_fft_sync(gr.hier_block2):
+class square_and_fft_sync_cc(gr.hier_block2):
     def __init__(self, samplerate, bits_per_sec, fftlen):
-		gr.hier_block2.__init__(self, "gmsk_sync",
+		gr.hier_block2.__init__(self, "square_and_fft_sync_cc",
                                 gr.io_signature(1, 1, gr.sizeof_gr_complex), # Input signature
                                 gr.io_signature(1, 1, gr.sizeof_gr_complex)) # Output signature
 

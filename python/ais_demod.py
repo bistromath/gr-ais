@@ -33,12 +33,12 @@ class ais_demod(gr.hier_block2):
         self._clockrec_gain = options[ "clockrec_gain" ]
         self._omega_relative_limit = options[ "omega_relative_limit" ]
         self.fftlen = options[ "fftlen" ]
-        self.freq_sync = satisfi.square_and_fft_sync_cc(self._samplerate, self._bits_per_sec, self.fftlen)
-        self.preamble = [1,1,-1,-1]*6
+        self.freq_sync = gmsk_sync.square_and_fft_sync_cc(self._samplerate, self._bits_per_sec, self.fftlen)
+        self.preamble = [1,1,-1,-1]*7
         self.preamble_detect = digital.msk_correlate_cc(self.preamble, 0.4, self._samples_per_symbol)
         self.wat = blocks.null_sink(gr.sizeof_gr_complex)
 #        self.tag_sink = blocks.tag_debug(gr.sizeof_gr_complex, "Butts")
-        self.agc = analog.feedforward_agc_cc(800, 1.75)
+        self.agc = analog.feedforward_agc_cc(512, 2)
         self.clockrec = digital.msk_timing_recovery_cc(self._samples_per_symbol,
                                                        self._clockrec_gain, #gain
                                                        self._omega_relative_limit, #error lim
