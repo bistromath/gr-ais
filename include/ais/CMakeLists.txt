@@ -21,9 +21,9 @@
 # Install public header files
 ########################################################################
 install(FILES
-    api.h
     freqest.h
     invert.h
     parse.h
-    unstuff.h DESTINATION include/ais
+    unstuff.h
+    DESTINATION include/ais
 )

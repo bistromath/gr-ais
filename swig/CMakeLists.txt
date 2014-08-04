@@ -18,6 +18,14 @@
 # Boston, MA 02110-1301, USA.
 
 ########################################################################
+# Check if there is C++ code at all
+########################################################################
+if(NOT ais_sources)
+	MESSAGE(STATUS "No C++ sources... skipping swig/")
+	return()
+endif(NOT ais_sources)
+
+########################################################################
 # Include swig generation macros
 ########################################################################
 find_package(SWIG)
