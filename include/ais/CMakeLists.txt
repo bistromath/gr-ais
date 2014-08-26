@@ -24,6 +24,5 @@ install(FILES
     api.h
     freqest.h
     invert.h
-    parse.h
     pdu_to_nmea.h DESTINATION include/ais
 )

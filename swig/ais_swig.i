@@ -10,7 +10,6 @@
 %{
 #include "ais/freqest.h"
 #include "ais/invert.h"
-#include "ais/parse.h"
 #include "ais/pdu_to_nmea.h"
 %}
 
@@ -19,8 +18,7 @@
 GR_SWIG_BLOCK_MAGIC2(ais, freqest);
 %include "ais/invert.h"
 GR_SWIG_BLOCK_MAGIC2(ais, invert);
-%include "ais/parse.h"
-GR_SWIG_BLOCK_MAGIC2(ais, parse);
+
 
 %include "ais/pdu_to_nmea.h"
 GR_SWIG_BLOCK_MAGIC2(ais, pdu_to_nmea);

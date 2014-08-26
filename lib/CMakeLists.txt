@@ -27,7 +27,6 @@ link_directories(${Boost_LIBRARY_DIRS})
 list(APPEND ais_sources
     freqest_impl.cc
     invert_impl.cc
-    parse_impl.cc
     pdu_to_nmea_impl.cc
 )
 
