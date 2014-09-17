@@ -18,7 +18,6 @@ from gnuradio import analog
 import math
 import ais
 import gmsk_sync
-import satisfi
 
 class ais_demod(gr.hier_block2):
     def __init__(self, options):
