@@ -91,7 +91,7 @@ find_package(Doxygen)
 # caps such as FILTER or FFT) and change the version to the minimum
 # API compatible version required.
 set(GR_REQUIRED_COMPONENTS RUNTIME PMT)
-find_package(Gnuradio "3.8" REQUIRED)
+find_package(Gnuradio "3.7.6" REQUIRED)
 
 if(NOT CPPUNIT_FOUND)
     message(FATAL_ERROR "CppUnit required to compile gr-ais")

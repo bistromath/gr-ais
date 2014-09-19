@@ -23,6 +23,6 @@
 install(FILES
     freqest.h
     invert.h
-    pdu_to_nmea.h DESTINATION include/ais
+    pdu_to_nmea.h
     DESTINATION include/ais
 )
