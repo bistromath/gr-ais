@@ -83,7 +83,7 @@ set(GRC_BLOCKS_DIR      ${GR_PKG_DATA_DIR}/grc/blocks)
 ########################################################################
 # Find gnuradio build dependencies
 ########################################################################
-find_package(GnuradioRuntime)
+find_package(GnuradioRuntime "3.8")
 find_package(CppUnit)
 
 # To run a more advanced search for GNU Radio and it's components and
@@ -92,13 +92,13 @@ find_package(CppUnit)
 # minimum API compatible version required.
 #
 # set(GR_REQUIRED_COMPONENTS RUNTIME BLOCKS FILTER ...)
-# find_package(Gnuradio "version")
+# find_package(Gnuradio "3.8")
 
 if(NOT GNURADIO_RUNTIME_FOUND)
-    message(FATAL_ERROR "GnuRadio Runtime required to compile ais")
+    message(FATAL_ERROR "GnuRadio Runtime required to compile gr-ais")
 endif()
 if(NOT CPPUNIT_FOUND)
-    message(FATAL_ERROR "CppUnit required to compile ais")
+    message(FATAL_ERROR "CppUnit required to compile gr-ais")
 endif()
 
 ########################################################################
