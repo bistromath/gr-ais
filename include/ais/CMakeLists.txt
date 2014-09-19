@@ -21,8 +21,8 @@
 # Install public header files
 ########################################################################
 install(FILES
-    api.h
     freqest.h
     invert.h
     pdu_to_nmea.h DESTINATION include/ais
+    DESTINATION include/ais
 )
