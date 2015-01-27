@@ -1,6 +1,6 @@
 /* -*- c++ -*- */
 /* 
- * Copyright 2014 <+YOU OR YOUR COMPANY+>.
+ * Copyright 2015 Nick Foster
  * 
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,6 +22,7 @@
 #include "config.h"
 #endif
 
+#include <cstdio>
 #include <gnuradio/io_signature.h>
 #include "pdu_to_nmea_impl.h"
 
