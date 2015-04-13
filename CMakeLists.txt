@@ -90,7 +90,7 @@ find_package(Doxygen)
 # components required to the list of GR_REQUIRED_COMPONENTS (in all
 # caps such as FILTER or FFT) and change the version to the minimum
 # API compatible version required.
-set(GR_REQUIRED_COMPONENTS RUNTIME PMT)
+set(GR_REQUIRED_COMPONENTS RUNTIME PMT FILTER BLOCKS)
 find_package(Gnuradio "3.7.6" REQUIRED)
 
 if(NOT CPPUNIT_FOUND)

@@ -28,6 +28,9 @@ list(APPEND ais_sources
     freqest_impl.cc
     invert_impl.cc
     pdu_to_nmea_impl.cc
+    msk_timing_recovery_cc_impl.cc
+    corr_est_cc_impl.cc
+    modulate_vector.cc
 )
 
 set(ais_sources "${ais_sources}" PARENT_SCOPE)
@@ -72,6 +75,7 @@ add_executable(test-ais ${test_ais_sources})
 target_link_libraries(
   test-ais
   ${GNURADIO_RUNTIME_LIBRARIES}
+  ${GNURADIO_FILTER_LIBRARIES}
   ${Boost_LIBRARIES}
   ${CPPUNIT_LIBRARIES}
   gnuradio-ais

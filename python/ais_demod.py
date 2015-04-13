@@ -34,11 +34,15 @@ class ais_demod(gr.hier_block2):
         self.fftlen = options[ "fftlen" ]
         self.freq_sync = gmsk_sync.square_and_fft_sync_cc(self._samplerate, self._bits_per_sec, self.fftlen)
         self.preamble = [1,1,-1,-1]*7
-        self.preamble_detect = digital.msk_correlate_cc(self.preamble, 0.4, self._samples_per_symbol)
+        self.mod = digital.gmsk_mod(self._samples_per_symbol, 0.4)
+        self.mod_vector = digital.modulate_vector(self.mod, self.preamble, [1])
+        self.preamble_detect = ais.corr_est_cc(self.mod_vector,
+                                               self._samples_per_symbol,
+                                               1, #mark delay
+                                               0.9) #threshold
         self.wat = blocks.null_sink(gr.sizeof_gr_complex)
-#        self.tag_sink = blocks.tag_debug(gr.sizeof_gr_complex, "Butts")
         self.agc = analog.feedforward_agc_cc(512, 2)
-        self.clockrec = digital.msk_timing_recovery_cc(self._samples_per_symbol,
+        self.clockrec = ais.msk_timing_recovery_cc(self._samples_per_symbol,
                                                        self._clockrec_gain, #gain
                                                        self._omega_relative_limit, #error lim
                                                        1) #output sps
