@@ -2,7 +2,7 @@
 <block>
   <name>pdu_to_nmea</name>
   <key>ais_pdu_to_nmea</key>
-  <category>ais</category>
+  <category>[ais]</category>
   <import>import ais</import>
   <make>ais.pdu_to_nmea($designator)</make>
 

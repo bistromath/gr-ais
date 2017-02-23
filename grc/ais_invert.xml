@@ -2,7 +2,7 @@
 <block>
   <name>invert</name>
   <key>ais_invert</key>
-  <category>ais</category>
+  <category>[ais]</category>
   <import>import ais</import>
   <make>ais.invert()</make>
   <sink>

@@ -2,7 +2,7 @@
 <block>
   <name>square_and_fft_sync_cc</name>
   <key>ais_square_and_fft_sync</key>
-  <category>ais</category>
+  <category>[ais]</category>
   <import>from ais import gmsk_sync</import>
   <make>gmsk_sync.square_and_fft_sync_cc($rate, $sps, $fftlen)</make>
   <!-- Make one 'param' node for every Parameter you want settable from the GUI.
