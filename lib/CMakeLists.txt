@@ -40,7 +40,7 @@ if(NOT ais_sources)
 endif(NOT ais_sources)
 
 add_library(gnuradio-ais SHARED ${ais_sources})
-target_link_libraries(gnuradio-ais ${Boost_LIBRARIES} ${GNURADIO_ALL_LIBRARIES})
+target_link_libraries(gnuradio-ais ${Boost_LIBRARIES} ${GNURADIO_ALL_LIBRARIES} ${VOLK_LIBRARIES})
 set_target_properties(gnuradio-ais PROPERTIES DEFINE_SYMBOL "gnuradio_ais_EXPORTS")
 
 if(APPLE)

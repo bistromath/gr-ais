@@ -63,6 +63,10 @@ if(NOT Boost_FOUND)
     message(FATAL_ERROR "Boost required to compile ais")
 endif()
 
+find_package(Volk)
+if(NOT VOLK_FOUND)
+    message(FATAL_ERROR "Volk library required to compile gr-ais")
+endif()
 ########################################################################
 # Install directories
 ########################################################################
@@ -137,12 +141,14 @@ include_directories(
     ${Boost_INCLUDE_DIRS}
     ${CPPUNIT_INCLUDE_DIRS}
     ${GNURADIO_ALL_INCLUDE_DIRS}
+    ${VOLK_INCLUDE_DIRS}
 )
 
 link_directories(
     ${Boost_LIBRARY_DIRS}
     ${CPPUNIT_LIBRARY_DIRS}
     ${GNURADIO_RUNTIME_LIBRARY_DIRS}
+    ${VOLK_LIBRARIES}
 )
 
 # Set component parameters
