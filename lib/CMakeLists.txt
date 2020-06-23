@@ -30,18 +30,19 @@ list(APPEND ais_sources
     pdu_to_nmea_impl.cc
     msk_timing_recovery_cc_impl.cc
     corr_est_cc_impl.cc
-    modulate_vector.cc
 )
 
 set(ais_sources "${ais_sources}" PARENT_SCOPE)
-if(NOT ais_sources)
-	MESSAGE(STATUS "No C++ sources... skipping lib/")
-	return()
-endif(NOT ais_sources)
 
 add_library(gnuradio-ais SHARED ${ais_sources})
-target_link_libraries(gnuradio-ais ${Boost_LIBRARIES} ${GNURADIO_ALL_LIBRARIES})
+target_link_libraries(gnuradio-ais gnuradio::gnuradio-runtime gnuradio::gnuradio-fft gnuradio::gnuradio-filter)
+target_include_directories(gnuradio-ais
+    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
+    PUBLIC $<INSTALL_INTERFACE:include>
+    )
 set_target_properties(gnuradio-ais PROPERTIES DEFINE_SYMBOL "gnuradio_ais_EXPORTS")
+set_target_properties(gnuradio-ais PROPERTIES SOVERSION "${VERSION_MAJOR}")
+set_target_properties(gnuradio-ais PROPERTIES VERSION "${VERSION_MAJOR}.${VERSION_MINOR}")
 
 if(APPLE)
     set_target_properties(gnuradio-ais PROPERTIES
@@ -49,36 +50,8 @@ if(APPLE)
     )
 endif(APPLE)
 
-########################################################################
-# Install built library files
-########################################################################
-install(TARGETS gnuradio-ais
-    LIBRARY DESTINATION lib${LIB_SUFFIX} # .so/.dylib file
-    ARCHIVE DESTINATION lib${LIB_SUFFIX} # .lib file
-    RUNTIME DESTINATION bin              # .dll file
-)
+include(GrMiscUtils)
+GR_LIBRARY_FOO(gnuradio-ais)
 
-########################################################################
-# Build and register unit test
-########################################################################
-include(GrTest)
-
-include_directories(${CPPUNIT_INCLUDE_DIRS})
-
-list(APPEND test_ais_sources
-    ${CMAKE_CURRENT_SOURCE_DIR}/test_ais.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/qa_ais.cc
-)
-
-add_executable(test-ais ${test_ais_sources})
-
-target_link_libraries(
-  test-ais
-  ${GNURADIO_RUNTIME_LIBRARIES}
-  ${GNURADIO_FILTER_LIBRARIES}
-  ${Boost_LIBRARIES}
-  ${CPPUNIT_LIBRARIES}
-  gnuradio-ais
-)
-
-GR_ADD_TEST(test_ais test-ais)
+message(STATUS "Using install prefix: ${CMAKE_INSTALL_PREFIX}")
+message(STATUS "Building for version: ${VERSION} / ${LIBVER}")

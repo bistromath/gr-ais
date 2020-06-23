@@ -17,7 +17,6 @@ from gnuradio import digital
 from gnuradio import analog
 import math
 import ais
-import gmsk_sync
 import random
 class ais_demod(gr.hier_block2):
     def __init__(self, options):
@@ -32,11 +31,11 @@ class ais_demod(gr.hier_block2):
         self._clockrec_gain = options[ "clockrec_gain" ]
         self._omega_relative_limit = options[ "omega_relative_limit" ]
         self.fftlen = options[ "fftlen" ]
-        self.freq_sync = gmsk_sync.square_and_fft_sync_cc(self._samplerate, self._bits_per_sec, self.fftlen)
+        self.freq_sync = ais.square_and_fft_sync_cc(self._samplerate, self._bits_per_sec, self.fftlen)
         self.agc = analog.feedforward_agc_cc(512, 2)
         self.preamble = [1,1,0,0]*7
         self.mod = digital.gmsk_mod(self._samples_per_symbol, 0.4)
-        self.mod_vector = ais.modulate_vector_bc(self.mod.to_basic_block(), self.preamble, [1])
+        self.mod_vector = digital.modulate_vector_bc(self.mod.to_basic_block(), self.preamble, [1])
         self.preamble_detect = ais.corr_est_cc(self.mod_vector,
                                                self._samples_per_symbol,
                                                1, #mark delay

@@ -40,9 +40,9 @@
 #include "config.h"
 #endif
 
-#include <gnuradio/blocks/vector_source_b.h>
-#include <gnuradio/blocks/vector_sink_c.h>
-#include <gnuradio/filter/fir_filter_ccf.h>
+#include <gnuradio/blocks/vector_source.h>
+#include <gnuradio/blocks/vector_sink.h>
+#include <gnuradio/filter/fir_filter.h>
 #include <gnuradio/top_block.h>
 #include <ais/modulate_vector.h>
 
@@ -52,9 +52,9 @@ namespace gr {
                                                std::vector<uint8_t> data,
                                                std::vector<float> taps)
     {
-      blocks::vector_source_b::sptr vector_src = blocks::vector_source_b::make(data);
-      filter::fir_filter_ccf::sptr filter = filter::fir_filter_ccf::make(1, taps);
-      blocks::vector_sink_c::sptr vector_sink = blocks::vector_sink_c::make();
+      blocks::vector_source<uint8_t>::sptr vector_src = blocks::vector_source<uint8_t>::make(data);
+      auto filter = filter::kernel::fir_filter_ccf(1, taps);
+      blocks::vector_sink<gr_complex>::sptr vector_sink = blocks::vector_sink<gr_complex>::make();
 
       top_block_sptr tb = make_top_block("modulate_vector");
 

@@ -80,7 +80,7 @@ class ais_radio (gr.top_block, pubsub):
 
     self._u = self._setup_source(options)
     self._rate = self.get_rate()
-    print "Rate is %i" % (self._rate,)
+    print("Rate is %i" % (self._rate,))
 
     if options.singlechannel is True:
         self._rx_paths = (ais_rx(0, options.rate, "A"),)
@@ -130,7 +130,7 @@ class ais_radio (gr.top_block, pubsub):
   def set_gain(self, gain):
     if self.live_source():
         self._u.set_gain(gain)
-        print "Gain is %f" % self.get_gain()
+        print("Gain is %f" % self.get_gain())
     return self.get_gain()
 
   def set_rate(self, rate):
@@ -152,15 +152,15 @@ class ais_radio (gr.top_block, pubsub):
     if options.source == "uhd":
       #UHD source by default
       from gnuradio import uhd
-      src = uhd.single_usrp_source(options.args, uhd.io_type_t.COMPLEX_FLOAT32, 1)
+      src = uhd.usrp_source(options.args, uhd.stream_args(cpu_format="fc32", channels=range(1)))
 
       if(options.subdev):
         src.set_subdev_spec(options.subdev, 0)
 
       if not src.set_center_freq(162.0e6 * (1 + options.error/1.e6)):
-        print "Failed to set initial frequency"
+        print("Failed to set initial frequency")
       else:
-        print "Tuned to %.3fMHz" % (src.get_center_freq() / 1.e6)
+        print("Tuned to %.3fMHz" % (src.get_center_freq() / 1.e6))
 
       #check for GPSDO
       #if you have a GPSDO, UHD will automatically set the timestamp to UTC time
@@ -177,9 +177,9 @@ class ais_radio (gr.top_block, pubsub):
         g = src.get_gain_range()
         options.gain = (g.start()+g.stop()) / 2.0
 
-      print "Setting gain to %i" % options.gain
+      print("Setting gain to %i" % options.gain)
       src.set_gain(options.gain)
-      print "Gain is %i" % src.get_gain()
+      print("Gain is %i" % src.get_gain())
 
     #TODO: detect if you're using an RTLSDR or Jawbreaker
     #and set up accordingly.
@@ -189,14 +189,14 @@ class ais_radio (gr.top_block, pubsub):
         src.set_sample_rate(options.rate)
         src.get_samp_rate = src.get_sample_rate #alias for UHD compatibility
         if not src.set_center_freq(162.0e6 * (1 + options.error/1.e6)):
-            print "Failed to set initial frequency"
+            print("Failed to set initial frequency")
         else:
-            print "Tuned to %.3fMHz" % (src.get_center_freq() / 1.e6)
+            print("Tuned to %.3fMHz" % (src.get_center_freq() / 1.e6))
 
         if options.gain is None:
             options.gain = 34
         src.set_gain(options.gain)
-        print "Gain is %i" % src.get_gain()
+        print("Gain is %i" % src.get_gain())
 
     else:
       #semantically detect whether it's ip.ip.ip.ip:port or filename
@@ -207,10 +207,10 @@ class ais_radio (gr.top_block, pubsub):
         except:
           raise Exception("Please input UDP source e.g. 192.168.10.1:12345")
         src = blocks.udp_source(gr.sizeof_gr_complex, ip, int(port))
-        print "Using UDP source %s:%s" % (ip, port)
+        print("Using UDP source %s:%s" % (ip, port))
       else:
         src = blocks.file_source(gr.sizeof_gr_complex, options.source)
-        print "Using file source %s" % options.source
+        print("Using file source %s" % options.source)
 
     return src
 

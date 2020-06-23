@@ -23,33 +23,14 @@ This is the GNU Radio GR_AIS module. Place your Python package
 description here (python/__init__.py).
 '''
 
-# ----------------------------------------------------------------
-# Temporary workaround for ticket:181 (swig+python problem)
-import sys
-_RTLD_GLOBAL = 0
-try:
-    from dl import RTLD_GLOBAL as _RTLD_GLOBAL
-except ImportError:
-    try:
-	from DLFCN import RTLD_GLOBAL as _RTLD_GLOBAL
-    except ImportError:
-	pass
-    
-if _RTLD_GLOBAL != 0:
-    _dlopenflags = sys.getdlopenflags()
-    sys.setdlopenflags(_dlopenflags|_RTLD_GLOBAL)
-# ----------------------------------------------------------------
-
+from __future__ import unicode_literals
 
 # import swig generated symbols into the gr_ais namespace
-from ais_swig import *
-#import fsm_utils
-import gmsk_sync
-from ais_demod import ais_demod
-import radio
+try:
+    from .ais_swig import *
+except ImportError:
+    pass
 
-# ----------------------------------------------------------------
-# Tail of workaround
-if _RTLD_GLOBAL != 0:
-    sys.setdlopenflags(_dlopenflags)      # Restore original flags
-# ----------------------------------------------------------------
+from .gmsk_sync import square_and_fft_sync_cc
+from .ais_demod import ais_demod
+from .radio import ais_rx
