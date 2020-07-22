@@ -42,8 +42,6 @@ include(GrPython)
 set(GR_SWIG_INCLUDE_DIRS $<TARGET_PROPERTY:gnuradio::runtime_swig,INTERFACE_INCLUDE_DIRECTORIES>)
 set(GR_SWIG_TARGET_DEPS gnuradio::runtime_swig)
 set(GR_SWIG_LIBRARIES gnuradio-ais)
-set(GR_SWIG_DOC_FILE ${CMAKE_CURRENT_BINARY_DIR}/ais_swig_doc.i)
-set(GR_SWIG_DOC_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/../include)
 
 GR_SWIG_MAKE(ais_swig ais_swig.i)
 
@@ -58,6 +56,5 @@ GR_SWIG_INSTALL(TARGETS ais_swig DESTINATION ${GR_PYTHON_DIR}/ais)
 install(
     FILES
     ais_swig.i
-    ${CMAKE_CURRENT_BINARY_DIR}/ais_swig_doc.i
     DESTINATION ${GR_INCLUDE_DIR}/ais/swig
 )
