@@ -4,9 +4,6 @@
 
 %include "gnuradio.i"			// the common stuff
 
-//load generated python docstrings
-%include "ais_swig_doc.i"
-
 %{
 #include "ais/freqest.h"
 #include "ais/invert.h"
