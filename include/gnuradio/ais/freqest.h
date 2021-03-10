@@ -22,7 +22,7 @@
 #ifndef INCLUDED_AIS_FREQEST_H
 #define INCLUDED_AIS_FREQEST_H
 
-#include <ais/api.h>
+#include <gnuradio/ais/api.h>
 #include <gnuradio/sync_block.h>
 
 namespace gr {
@@ -33,7 +33,7 @@ namespace gr {
      * \ingroup ais
      *
      */
-    class AIS_API freqest : virtual public gr::sync_block
+    class GR_AIS_API freqest : virtual public gr::sync_block
     {
      public:
       typedef boost::shared_ptr<freqest> sptr;

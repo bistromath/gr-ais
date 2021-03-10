@@ -48,7 +48,7 @@ GR_SWIG_MAKE(ais_swig ais_swig.i)
 ########################################################################
 # Install the build swig module
 ########################################################################
-GR_SWIG_INSTALL(TARGETS ais_swig DESTINATION ${GR_PYTHON_DIR}/ais)
+GR_SWIG_INSTALL(TARGETS ais_swig DESTINATION ${GR_PYTHON_DIR}/gnuradio/ais)
 
 ########################################################################
 # Install swig .i files for development
@@ -56,5 +56,5 @@ GR_SWIG_INSTALL(TARGETS ais_swig DESTINATION ${GR_PYTHON_DIR}/ais)
 install(
     FILES
     ais_swig.i
-    DESTINATION ${GR_INCLUDE_DIR}/ais/swig
+    DESTINATION ${GR_INCLUDE_DIR}/gnuradio/swig
 )

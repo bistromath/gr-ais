@@ -31,11 +31,9 @@ endif()
 GR_PYTHON_INSTALL(
     FILES
     __init__.py
-    gmsk_sync.py
+    square_and_fft_sync_cc.py
     fsm_utils.py
-    ais_demod.py
-    radio.py
-    DESTINATION ${GR_PYTHON_DIR}/ais
+    DESTINATION ${GR_PYTHON_DIR}/gnuradio/ais
 )
 
 ########################################################################

@@ -24,7 +24,7 @@ outputs:
     optional: true
 
 templates:
-    imports: 'from ais import pdu_to_nmea'
+    imports: 'from gnuradio.ais import pdu_to_nmea'
     make: "pdu_to_nmea(${designator})"
 
 documentation: ''

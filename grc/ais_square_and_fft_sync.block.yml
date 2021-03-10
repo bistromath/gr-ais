@@ -31,7 +31,7 @@ outputs:
     optional: false
 
 templates:
-    imports: 'from ais import square_and_fft_sync_cc'
+    imports: 'from gnuradio.ais import square_and_fft_sync_cc'
     make: "square_and_fft_sync_cc(samplerate=${ samp_rate }, bits_per_sec=${ bits_per_sec }, fftlen=${ fftlen })"
 
 documentation: ''

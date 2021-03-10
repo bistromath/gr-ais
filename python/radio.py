@@ -33,7 +33,7 @@ import threading
 import time
 import sys
 import re
-import ais
+from gnuradio import ais
 
 #hier block encapsulating all the signal processing after the source
 #could probably be split into its own file

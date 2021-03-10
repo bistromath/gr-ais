@@ -23,5 +23,5 @@
 install(FILES
     freqest.h
     pdu_to_nmea.h
-    DESTINATION include/ais
+    DESTINATION include/gnuradio/ais
 )

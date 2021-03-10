@@ -21,7 +21,7 @@
 #ifndef INCLUDED_AIS_FREQEST_IMPL_H
 #define INCLUDED_AIS_FREQEST_IMPL_H
 
-#include <ais/freqest.h>
+#include <gnuradio/ais/freqest.h>
 
 namespace gr {
   namespace ais {
@@ -37,8 +37,8 @@ namespace gr {
       ~freqest_impl();
 
       int work(int noutput_items,
-		       gr_vector_const_void_star &input_items,
-		       gr_vector_void_star &output_items);
+            gr_vector_const_void_star &input_items,
+            gr_vector_void_star &output_items);
     };
 
   } // namespace ais

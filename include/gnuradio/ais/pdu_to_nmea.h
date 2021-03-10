@@ -22,7 +22,7 @@
 #ifndef INCLUDED_AIS_PDU_TO_NMEA_H
 #define INCLUDED_AIS_PDU_TO_NMEA_H
 
-#include <ais/api.h>
+#include <gnuradio/ais/api.h>
 #include <gnuradio/block.h>
 
 namespace gr {
@@ -33,7 +33,7 @@ namespace gr {
      * \ingroup ais
      *
      */
-    class AIS_API pdu_to_nmea : virtual public gr::block
+    class GR_AIS_API pdu_to_nmea : virtual public gr::block
     {
      public:
       typedef boost::shared_ptr<pdu_to_nmea> sptr;

@@ -31,6 +31,4 @@ try:
 except ImportError:
     pass
 
-from .gmsk_sync import square_and_fft_sync_cc
-from .ais_demod import ais_demod
-from .radio import ais_rx
+from .square_and_fft_sync_cc import square_and_fft_sync_cc
