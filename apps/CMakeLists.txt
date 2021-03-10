@@ -19,8 +19,8 @@
 
 include(GrPython)
 
-GR_PYTHON_INSTALL(
-    PROGRAMS
-    ais_rx
-    DESTINATION bin
-)
+#GR_PYTHON_INSTALL(
+#    PROGRAMS
+#    ais_rx
+#    DESTINATION bin
+#)

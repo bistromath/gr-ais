@@ -26,10 +26,7 @@ include_directories(${Boost_INCLUDE_DIR})
 link_directories(${Boost_LIBRARY_DIRS})
 list(APPEND ais_sources
     freqest_impl.cc
-    invert_impl.cc
     pdu_to_nmea_impl.cc
-    msk_timing_recovery_cc_impl.cc
-    corr_est_cc_impl.cc
 )
 
 set(ais_sources "${ais_sources}" PARENT_SCOPE)

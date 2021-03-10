@@ -1,6 +1,6 @@
 id: pdu_to_nmea
 label: PDU to NMEA
-category: AIS
+category: '[AIS]'
 
 parameters:
 -   id: designator

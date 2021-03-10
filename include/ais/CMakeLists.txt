@@ -22,9 +22,6 @@
 ########################################################################
 install(FILES
     freqest.h
-    invert.h
     pdu_to_nmea.h
-    corr_est_cc.h
-    msk_timing_recovery_cc.h
     DESTINATION include/ais
 )

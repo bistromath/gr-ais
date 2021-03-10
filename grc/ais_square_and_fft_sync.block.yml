@@ -1,6 +1,6 @@
 id: square_and_fft_sync
 label: Square-and-FFT coarse sync
-category: AIS
+category: '[AIS]'
 
 parameters:
 -   id: samp_rate
