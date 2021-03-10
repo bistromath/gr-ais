@@ -13,15 +13,15 @@ You will need to install Gnuradio 3.8 or 3.9, a hardware driver for your SDR (UH
 One caveat is that I had to fix a bug in the GMSK timing error detector in GNURadio, and so for gr-ais to work well, you will need a version of Gnuradio which includes this fix. Because I just got around to fixing it today (9 Mar 21), you'll want a version which was compiled after that date. 
 
 Once you have the prerequisites, you can install it like any other Gnuradio project:
-
+```
 $ mkdir build
 $ cd build
 $ cmake ../
 $ make
 $ sudo make install
-
+```
 Once that's done, you can run ais_rx.py:
-
+```
 nick@prawn:~/dev/gr-ais/apps grc*$ ./ais_rx.py --help
 usage: ais_rx.py [-h] [--ant ANT] [--args ARGS] [--dev-str DEV_STR] [--gain GAIN]
                  [--samp-rate SAMP_RATE] [--stream-args STREAM_ARGS] [--ted-bw TED_BW]
@@ -40,5 +40,5 @@ optional arguments:
   --ted-bw TED_BW       Set TED bandwidth [default='33.0m']
   --threshold THRESHOLD
                         Set Correlator threshold [default='830.0m']
-
+```
 You will have to change these settings based on what SDR you are using. An RTL-SDR can only sample at 2.4Msps, for instance. Antenna names will vary between devices. You can probably leave --ted-bw and --threshold alone: the defaults should be fine. The sample rate just needs to be above 70kHz, so gr-ais can capture both AIS channels for decoding. If you wish to use a much slower device (a soundcard on a discriminator tap, for instance) you could create a version which uses an Audio Source block and which feeds only a single AIS receiver core block.
