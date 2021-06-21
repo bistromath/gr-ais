@@ -17,8 +17,8 @@
 # the Free Software Foundation, Inc., 51 Franklin Street,
 # Boston, MA 02110-1301, USA.
 install(FILES
-    ais_invert.xml
-    ais_square_and_fft_sync_cc.xml
-    ais_pdu_to_nmea.xml
+    ais_invert.block.yml
+    ais_square_and_fft_sync_cc.block.yml
+    ais_pdu_to_nmea.block.yml
     DESTINATION share/gnuradio/grc/blocks
 )
