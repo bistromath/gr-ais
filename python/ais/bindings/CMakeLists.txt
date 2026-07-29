@@ -27,9 +27,7 @@ include(GrPybind)
 list(APPEND ais_python_files
     invert_python.cc
     freqest_python.cc
-    pdu_to_nmea_python.cc
-    corr_est_cc_python.cc
-    modulate_vector_python.cc python_bindings.cc)
+    pdu_to_nmea_python.cc python_bindings.cc)
 
 gr_pybind_make_oot(ais ../../.. gr::ais "${ais_python_files}")
 

@@ -12,6 +12,4 @@
 install(FILES api.h
     invert.h
     freqest.h
-    pdu_to_nmea.h
-    corr_est_cc.h
-    modulate_vector.h DESTINATION include/gnuradio/ais)
+    pdu_to_nmea.h DESTINATION include/gnuradio/ais)

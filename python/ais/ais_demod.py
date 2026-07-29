@@ -15,7 +15,7 @@ from gnuradio import digital
 from gnuradio import analog
 import math
 
-from .ais_python import corr_est_cc, invert
+from .ais_python import invert
 from .gmsk_sync import square_and_fft_sync_cc
 class ais_demod(gr.hier_block2):
     def __init__(self, options):
@@ -35,10 +35,10 @@ class ais_demod(gr.hier_block2):
         self.preamble = [1,1,0,0]*7
         self.mod = digital.gmsk_mod(self._samples_per_symbol, 0.4)
         self.mod_vector = digital.modulate_vector_bc(self.mod.to_basic_block(), self.preamble, [1])
-        self.preamble_detect = corr_est_cc(self.mod_vector,
-                                           self._samples_per_symbol,
-                                           1, #mark delay
-                                           0.9) #threshold
+        self.preamble_detect = digital.corr_est_cc(self.mod_vector,
+                                                   self._samples_per_symbol,
+                                                   1, #mark delay
+                                                   0.9) #threshold
 
         #the Mengali-D'Andrea GMSK TED operates on the CPM signal directly,
         #matches the AIS GMSK BT=0.4 pulse shaping, and is seeded by the

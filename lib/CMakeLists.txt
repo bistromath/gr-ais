@@ -14,9 +14,7 @@ include(GrPlatform) #define LIB_SUFFIX
 list(APPEND ais_sources
     invert_impl.cc
     freqest_impl.cc
-    pdu_to_nmea_impl.cc
-    corr_est_cc_impl.cc
-    modulate_vector.cc)
+    pdu_to_nmea_impl.cc)
 
 set(ais_sources
     "${ais_sources}"
@@ -27,8 +25,7 @@ if(NOT ais_sources)
 endif(NOT ais_sources)
 
 add_library(gnuradio-ais SHARED ${ais_sources})
-target_link_libraries(gnuradio-ais gnuradio::gnuradio-runtime gnuradio::gnuradio-blocks
-                      gnuradio::gnuradio-filter)
+target_link_libraries(gnuradio-ais gnuradio::gnuradio-runtime)
 target_include_directories(
     gnuradio-ais
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
