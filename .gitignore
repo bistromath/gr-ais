@@ -31,3 +31,5 @@
 /stamp-h1.in
 /stamp-h2.in
 build
+__pycache__/
+*.pyc

@@ -36,15 +36,11 @@
 * taps as: list or array
 */
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-
 #include <gnuradio/blocks/vector_source.h>
 #include <gnuradio/blocks/vector_sink.h>
-#include <gnuradio/filter/fir_filter.h>
+#include <gnuradio/filter/fir_filter_blk.h>
 #include <gnuradio/top_block.h>
-#include <ais/modulate_vector.h>
+#include <gnuradio/ais/modulate_vector.h>
 
 namespace gr {
   namespace ais {
@@ -53,7 +49,7 @@ namespace gr {
                                                std::vector<float> taps)
     {
       blocks::vector_source<uint8_t>::sptr vector_src = blocks::vector_source<uint8_t>::make(data);
-      auto filter = filter::kernel::fir_filter_ccf(1, taps);
+      auto filter = filter::fir_filter_ccf::make(1, taps);
       blocks::vector_sink<gr_complex>::sptr vector_sink = blocks::vector_sink<gr_complex>::make();
 
       top_block_sptr tb = make_top_block("modulate_vector");

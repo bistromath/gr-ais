@@ -21,7 +21,7 @@
 #ifndef INCLUDED_AIS_INVERT_IMPL_H
 #define INCLUDED_AIS_INVERT_IMPL_H
 
-#include <ais/invert.h>
+#include <gnuradio/ais/invert.h>
 
 namespace gr {
   namespace ais {

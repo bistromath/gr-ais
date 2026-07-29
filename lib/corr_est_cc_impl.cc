@@ -20,10 +20,6 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-
 #include <gnuradio/io_signature.h>
 #include <gnuradio/math.h>
 #include "corr_est_cc_impl.h"
@@ -168,7 +164,7 @@ namespace gr {
     {
       gr::thread::scoped_lock lock(d_setlock);
 
-      const gr_complex *in = (gr_complex *)input_items[0];
+      const gr_complex *in = (const gr_complex *)input_items[0];
       gr_complex *out = (gr_complex*)output_items[0];
       gr_complex *corr;
       if (output_items.size() > 1)

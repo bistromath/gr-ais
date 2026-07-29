@@ -1,0 +1,17 @@
+id: ais_invert
+label: invert
+category: '[ais]'
+
+templates:
+  imports: from gnuradio import ais
+  make: ais.invert()
+
+inputs:
+- label: in
+  dtype: byte
+
+outputs:
+- label: out
+  dtype: byte
+
+file_format: 1

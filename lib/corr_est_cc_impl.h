@@ -23,7 +23,7 @@
 #ifndef INCLUDED_DIGITAL_CORR_EST_CC_IMPL_H
 #define INCLUDED_DIGITAL_CORR_EST_CC_IMPL_H
 
-#include <ais/corr_est_cc.h>
+#include <gnuradio/ais/corr_est_cc.h>
 #include <gnuradio/filter/fft_filter.h>
 
 using namespace gr::filter;

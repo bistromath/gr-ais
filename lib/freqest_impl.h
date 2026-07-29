@@ -21,7 +21,7 @@
 #ifndef INCLUDED_AIS_FREQEST_IMPL_H
 #define INCLUDED_AIS_FREQEST_IMPL_H
 
-#include <ais/freqest.h>
+#include <gnuradio/ais/freqest.h>
 
 namespace gr {
   namespace ais {

@@ -1,0 +1,27 @@
+id: ais_pdu_to_nmea
+label: pdu_to_nmea
+category: '[ais]'
+
+templates:
+  imports: from gnuradio import ais
+  make: ais.pdu_to_nmea(${designator})
+
+parameters:
+- id: designator
+  label: Designator
+  dtype: string
+
+inputs:
+- label: print
+  domain: message
+  optional: true
+- label: to_nmea
+  domain: message
+  optional: true
+
+outputs:
+- label: out
+  domain: message
+  optional: true
+
+file_format: 1

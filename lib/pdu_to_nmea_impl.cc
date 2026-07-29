@@ -18,10 +18,6 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-
 #include <cstdio>
 #include <gnuradio/io_signature.h>
 #include "pdu_to_nmea_impl.h"
@@ -46,9 +42,9 @@ namespace gr {
         d_designator(designator)
     {
         message_port_register_in(pmt::mp("print"));
-        set_msg_handler(pmt::mp("print"), boost::bind(&pdu_to_nmea_impl::print, this, _1));
+        set_msg_handler(pmt::mp("print"), [this](pmt::pmt_t msg) { print(msg); });
         message_port_register_in(pmt::mp("to_nmea"));
-        set_msg_handler(pmt::mp("to_nmea"), boost::bind(&pdu_to_nmea_impl::to_nmea, this, _1));
+        set_msg_handler(pmt::mp("to_nmea"), [this](pmt::pmt_t msg) { to_nmea(msg); });
         message_port_register_out(pmt::mp("out"));
     }
 
@@ -80,7 +76,7 @@ namespace gr {
 
     std::string pdu_to_nmea_impl::to_ascii(std::vector<uint8_t> msg) {
         std::string ret(msg.begin(), msg.end());
-        for(int i=0; i<ret.size(); i++) {
+        for(size_t i=0; i<ret.size(); i++) {
             if(ret[i] > 39) ret[i] += 8;
             ret[i] += char(48);
         }
@@ -105,16 +101,16 @@ namespace gr {
         while(frag_id <= num_frags) {
             if(frag_id > 1) ret += "\n";
             std::string this_sentence =  "!AIVDM,"
-                                         + boost::to_string(num_frags)
+                                         + std::to_string(num_frags)
                                          + ","
-                                         + boost::to_string(frag_id++)
+                                         + std::to_string(frag_id++)
                                          + ",,"
                                          + d_designator
                                          + ",";
 
             std::string this_frag = ascii.substr(frag_offset, nmea_max);
             frag_offset += this_frag.length();
-            this_sentence += this_frag + "," + boost::to_string(int(npad));
+            this_sentence += this_frag + "," + std::to_string(int(npad));
             char wat[3];
             uint8_t checksum = get_checksum(this_sentence);
             snprintf(wat, 3, "%02X", checksum); //NMEA 0183 checksum
@@ -138,7 +134,8 @@ namespace gr {
         std::string aivdm = msg_to_sentence(msg);
         //make PDU
         pmt::pmt_t pdu(pmt::cons(pmt::PMT_NIL,
-                                 pmt::init_u8vector(aivdm.length(), (uint8_t *)aivdm.c_str())));
+                                 pmt::init_u8vector(aivdm.length(),
+                                                    reinterpret_cast<const uint8_t *>(aivdm.data()))));
         //post to output port
         message_port_pub(pmt::mp("out"), pdu);
     }

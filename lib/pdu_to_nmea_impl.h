@@ -21,7 +21,7 @@
 #ifndef INCLUDED_AIS_PDU_TO_NMEA_IMPL_H
 #define INCLUDED_AIS_PDU_TO_NMEA_IMPL_H
 
-#include <ais/pdu_to_nmea.h>
+#include <gnuradio/ais/pdu_to_nmea.h>
 #include <pmt/pmt.h>
 #include <string>
 
