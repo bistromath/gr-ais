@@ -40,10 +40,12 @@ class ais_demod(gr.hier_block2):
                                                    1, #mark delay
                                                    0.9) #threshold
 
-        #the Mengali-D'Andrea GMSK TED operates on the CPM signal directly,
-        #matches the AIS GMSK BT=0.4 pulse shaping, and is seeded by the
-        #time_est tags from the correlator
-        self.clockrec = digital.symbol_sync_cc(digital.TED_MENGALI_AND_DANDREA_GMSK,
+        #the D'Andrea-Mengali generalized MSK TED operates on the CPM signal
+        #directly and is seeded by the time_est tags from the correlator.
+        #measured on GMSK BT=0.4 AIS bursts it acquires cleanly where the
+        #TED_MENGALI_AND_DANDREA_GMSK variant drops bits at the preamble-to-
+        #flag pattern transition
+        self.clockrec = digital.symbol_sync_cc(digital.TED_DANDREA_AND_MENGALI_GEN_MSK,
                                                self._samples_per_symbol,
                                                self._clockrec_gain, #loop bandwidth
                                                1.0, #damping
