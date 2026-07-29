@@ -55,7 +55,6 @@ namespace gr {
     {
     }
 
-    //TODO: test with padding more thoroughly
     std::vector<uint8_t> pdu_to_nmea_impl::unpack_bits(pmt::pmt_t msg, uint8_t *npad) {
         const uint8_t *p = (const uint8_t *) pmt::blob_data(pmt::cdr(msg));
         int len = pmt::blob_length(pmt::cdr(msg));
@@ -66,9 +65,6 @@ namespace gr {
         for(int i=0; i<nbits; i++) {
             uint8_t bit = (p[i/8] >> (7-(i%8))) & 1;
             up[i/6] |= (bit << (5-(i%6)));
-        }
-        for(int i=0;i<*npad; i++) {
-            up[nbits/6] <<= 1;
         }
 
         return up;
