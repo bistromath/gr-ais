@@ -28,6 +28,7 @@ gr_python_install(FILES __init__.py gmsk_sync.py ais_demod.py radio.py
 include(GrTest)
 
 set(GR_TEST_TARGET_DEPS gnuradio-ais)
+set(GR_TEST_LIBRARY_DIRS ${CMAKE_BINARY_DIR}/lib)
 
 # Create a package directory that tests can import. It includes everything
 # from `python/`.
@@ -35,3 +36,9 @@ add_custom_target(
     copy_module_for_tests ALL
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}
             ${PROJECT_BINARY_DIR}/test_modules/gnuradio/ais/)
+
+GR_ADD_TEST(qa_invert ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_invert.py)
+GR_ADD_TEST(qa_freqest ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_freqest.py)
+GR_ADD_TEST(qa_pdu_to_nmea ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_pdu_to_nmea.py)
+GR_ADD_TEST(qa_gmsk_sync ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_gmsk_sync.py)
+GR_ADD_TEST(qa_ais_demod ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_ais_demod.py)
