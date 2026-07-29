@@ -4,18 +4,19 @@
 #does not unstuff bits
 
 #modified 4/29/10 to include frequency estimation to center signals at baseband
-#eventually will do coherent demodulation
-#right now, it does coherent demod, but it's crippled for two reasons.
-#first, there's no "reset" input on the gr-trellis VA, so the algorithm doesn't get properly initialized at the start of a packet
-#second, there's no provision for phase estimation, so the combined trellis assumes each packet starts at phase=0.
-#sometimes it'll cope with this, but it loses a lot of packets
+#the coherent demodulator uses a bespoke CPM Viterbi block (viterbi_cpm_cb)
+#instead of the gr-trellis VA: the carrier phase is part of its trellis state
+#and decoded bits are the phase increments, so constant phase offsets are
+#absorbed structurally, and a decision-directed loop tracks residual drift.
+#set options["coherent"] = False for the older differential discriminator.
 
 from gnuradio import gr
 from gnuradio import digital
 from gnuradio import analog
 import math
 
-from .ais_python import invert
+from .ais_python import invert, viterbi_cpm_cb
+from .cpm_trellis import gmsk_trellis
 from .gmsk_sync import square_and_fft_sync_cc
 class ais_demod(gr.hier_block2):
     def __init__(self, options):
@@ -29,6 +30,7 @@ class ais_demod(gr.hier_block2):
         self._samplerate = self._samples_per_symbol * self._bits_per_sec
         self._clockrec_gain = options[ "clockrec_gain" ]
         self._omega_relative_limit = options[ "omega_relative_limit" ]
+        self._coherent = options.get("coherent", True)
         self.fftlen = options[ "fftlen" ]
         self.freq_sync = square_and_fft_sync_cc(self._samplerate, self._bits_per_sec, self.fftlen)
         self.agc = analog.feedforward_agc_cc(512, 2)
@@ -40,6 +42,7 @@ class ais_demod(gr.hier_block2):
                                                    1, #mark delay
                                                    0.9) #threshold
 
+        clockrec_osps = 2 if self._coherent else 1
         #the D'Andrea-Mengali generalized MSK TED operates on the CPM signal
         #directly and is seeded by the time_est tags from the correlator.
         #measured on GMSK BT=0.4 AIS bursts it acquires cleanly where the
@@ -51,14 +54,23 @@ class ais_demod(gr.hier_block2):
                                                1.0, #damping
                                                1.0, #TED gain
                                                self._omega_relative_limit * self._samples_per_symbol, #max deviation
-                                               1) #output sps
+                                               clockrec_osps)
 
-        sensitivity = (math.pi / 2)
-        self.demod = analog.quadrature_demod_cf(sensitivity) #param is gain
-        self.slicer = digital.binary_slicer_fb()
         self.diff = digital.diff_decoder_bb(2)
         self.invert = invert() #NRZI signal diff decoded and inverted should give original signal
 
-#        self.connect(self, self.gmsk_sync)
-
-        self.connect(self, self.freq_sync, self.agc, (self.preamble_detect, 0), self.clockrec, self.demod, self.slicer, self.diff, self.invert, self)
+        if self._coherent:
+            signals, next_state, num_states = gmsk_trellis(clockrec_osps)
+            self.trellis_demod = viterbi_cpm_cb(signals,
+                                                next_state,
+                                                clockrec_osps,
+                                                48, #traceback length, symbols
+                                                0.1) #phase tracking gain
+            self.connect(self, self.freq_sync, self.agc, (self.preamble_detect, 0),
+                         self.clockrec, self.trellis_demod, self.diff, self.invert, self)
+        else:
+            sensitivity = (math.pi / 2)
+            self.demod = analog.quadrature_demod_cf(sensitivity) #param is gain
+            self.slicer = digital.binary_slicer_fb()
+            self.connect(self, self.freq_sync, self.agc, (self.preamble_detect, 0),
+                         self.clockrec, self.demod, self.slicer, self.diff, self.invert, self)

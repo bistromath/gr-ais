@@ -53,11 +53,12 @@ class ais_rx(gr.hier_block2):
 #        self.resamp = pfb.arb_resampler_ccf((self._bits_per_sec*self._samples_per_symbol)/int(rate/self._filter_decimation))
         options = {}
         options[ "samples_per_symbol" ] = (rate/self._filter_decimation)/self._bits_per_sec
-        options[ "clockrec_gain" ] = 0.04
+        options[ "clockrec_gain" ] = 0.01
         options[ "omega_relative_limit" ] = 0.01
         options[ "bits_per_sec" ] = self._bits_per_sec
         options[ "fftlen" ] = 1024 #trades off accuracy of freq estimation in presence of noise, vs. delay time.
         options[ "samp_rate" ] = self._bits_per_sec * self._samples_per_symbol
+        options[ "coherent" ] = True
         self.demod = ais_demod(options) #ais_demod takes in complex baseband and spits out 1-bit unpacked bitstream
         self.deframer = digital.hdlc_deframer_bp(11,64) #takes bytes, deframes, unstuffs, CRCs, and emits PDUs with frame contents
         self.nmea = pdu_to_nmea(designator) #turns data PDUs into NMEA sentences

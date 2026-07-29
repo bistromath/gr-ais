@@ -14,7 +14,8 @@ include(GrPlatform) #define LIB_SUFFIX
 list(APPEND ais_sources
     invert_impl.cc
     freqest_impl.cc
-    pdu_to_nmea_impl.cc)
+    pdu_to_nmea_impl.cc
+    viterbi_cpm_cb_impl.cc)
 
 set(ais_sources
     "${ais_sources}"

@@ -24,6 +24,7 @@ namespace py = pybind11;
     void bind_invert(py::module& m);
     void bind_freqest(py::module& m);
     void bind_pdu_to_nmea(py::module& m);
+    void bind_viterbi_cpm_cb(py::module& m);
 // ) END BINDING_FUNCTION_PROTOTYPES
 
 
@@ -55,5 +56,6 @@ PYBIND11_MODULE(ais_python, m)
     bind_invert(m);
     bind_freqest(m);
     bind_pdu_to_nmea(m);
+    bind_viterbi_cpm_cb(m);
     // ) END BINDING_FUNCTION_CALLS
 }

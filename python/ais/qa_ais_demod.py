@@ -16,10 +16,12 @@ from gnuradio.ais.qa_common import (SAMP_RATE, BIT_RATE, SPS,
                                     REFERENCE_PAYLOAD, hdlc_frame,
                                     nrzi_encode, gmsk_modulate)
 
-#measured decode threshold of the current demodulator is ~15 dB Eb/N0
-#(differential detection plus square-and-FFT frequency sync); 20 dB keeps
-#this regression test deterministic until the sensitivity work happens
-EB_N0_DB = 20.0
+#measured decode thresholds: ~15 dB Eb/N0 for the noncoherent chain
+#(differential detection plus square-and-FFT frequency sync), ~7-8 dB for
+#the coherent trellis chain. each test runs several dB above its threshold
+#to stay deterministic
+NONCOHERENT_EB_N0_DB = 20.0
+COHERENT_EB_N0_DB = 12.0
 FREQ_OFFSET_HZ = 500.0
 TIMING_OFFSET_SAMPLES = 2.3
 DEMOD_OPTIONS = {
@@ -33,10 +35,14 @@ DEMOD_OPTIONS = {
 
 
 def ais_burst(payload):
-    training = [0, 1] * 1000
+    #random filler stands in for surrounding channel traffic: a long
+    #periodic 01 training would put a comb of lines in the squared
+    #spectrum and derail the square-and-FFT frequency estimator
+    rng = np.random.default_rng(99)
+    filler_head = rng.integers(0, 2, 2000).tolist()
+    filler_tail = rng.integers(0, 2, 1500).tolist()
     preamble = [0, 1] * 12
-    tail = [0, 1] * 750
-    return gmsk_modulate(nrzi_encode(training + preamble + hdlc_frame(payload) + tail))
+    return gmsk_modulate(nrzi_encode(filler_head + preamble + hdlc_frame(payload) + filler_tail))
 
 
 def channel(samples, eb_n0_db, freq_offset_hz, timing_offset, seed):
@@ -59,13 +65,13 @@ class qa_ais_demod(gr_unittest.TestCase):
     def tearDown(self):
         self.tb = None
 
-    def test_decodes_ais_frame_in_awgn(self):
-        samples = channel(ais_burst(REFERENCE_PAYLOAD), EB_N0_DB,
-                          FREQ_OFFSET_HZ, TIMING_OFFSET_SAMPLES, seed=1)
+    def _decode_burst(self, options, eb_n0_db, seed):
+        samples = channel(ais_burst(REFERENCE_PAYLOAD), eb_n0_db,
+                          FREQ_OFFSET_HZ, TIMING_OFFSET_SAMPLES, seed)
         src = blocks.vector_source_c(samples.tolist())
         channel_filter = grfilter.fir_filter_ccf(
             1, grfilter.firdes.low_pass(1, SAMP_RATE, 11000, 1000))
-        demod = ais.ais_demod(DEMOD_OPTIONS)
+        demod = ais.ais_demod(options)
         deframer = digital.hdlc_deframer_bp(11, 64)
         debug = blocks.message_debug()
         self.tb.connect(src, channel_filter, demod, deframer)
@@ -77,7 +83,20 @@ class qa_ais_demod(gr_unittest.TestCase):
             time.sleep(0.01)
 
         self.assertGreaterEqual(debug.num_messages(), 1)
-        decoded = bytes(pmt.u8vector_elements(pmt.cdr(debug.get_message(0))))
+        return bytes(pmt.u8vector_elements(pmt.cdr(debug.get_message(0))))
+
+    def test_decodes_ais_frame_in_awgn_noncoherent(self):
+        options = dict(DEMOD_OPTIONS, coherent=False)
+
+        decoded = self._decode_burst(options, NONCOHERENT_EB_N0_DB, seed=1)
+
+        self.assertEqual(decoded, REFERENCE_PAYLOAD)
+
+    def test_decodes_ais_frame_in_awgn_coherent(self):
+        options = dict(DEMOD_OPTIONS, coherent=True, clockrec_gain=0.01)
+
+        decoded = self._decode_burst(options, COHERENT_EB_N0_DB, seed=1)
+
         self.assertEqual(decoded, REFERENCE_PAYLOAD)
 
 
