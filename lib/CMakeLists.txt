@@ -15,7 +15,8 @@ list(APPEND ais_sources
     invert_impl.cc
     freqest_impl.cc
     pdu_to_nmea_impl.cc
-    viterbi_cpm_cb_impl.cc)
+    viterbi_cpm_cb_impl.cc
+    burst_sync_cc_impl.cc)
 
 set(ais_sources
     "${ais_sources}"

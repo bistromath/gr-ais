@@ -13,4 +13,5 @@ install(FILES api.h
     invert.h
     freqest.h
     pdu_to_nmea.h
-    viterbi_cpm_cb.h DESTINATION include/gnuradio/ais)
+    viterbi_cpm_cb.h
+    burst_sync_cc.h DESTINATION include/gnuradio/ais)

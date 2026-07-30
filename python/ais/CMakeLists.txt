@@ -19,7 +19,8 @@ add_subdirectory(bindings)
 ########################################################################
 # Install python sources
 ########################################################################
-gr_python_install(FILES __init__.py gmsk_sync.py cpm_trellis.py ais_demod.py radio.py
+gr_python_install(FILES __init__.py gmsk_sync.py cpm_trellis.py ais_demod.py
+                  burst_demod.py radio.py
                   DESTINATION ${GR_PYTHON_DIR}/gnuradio/ais)
 
 ########################################################################
@@ -40,6 +41,8 @@ add_custom_target(
 GR_ADD_TEST(qa_invert ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_invert.py)
 GR_ADD_TEST(qa_cpm_trellis ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_cpm_trellis.py)
 GR_ADD_TEST(qa_viterbi_cpm_cb ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_viterbi_cpm_cb.py)
+GR_ADD_TEST(qa_burst_sync_cc ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_burst_sync_cc.py)
+GR_ADD_TEST(qa_burst_demod ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_burst_demod.py)
 GR_ADD_TEST(qa_freqest ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_freqest.py)
 GR_ADD_TEST(qa_pdu_to_nmea ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_pdu_to_nmea.py)
 GR_ADD_TEST(qa_gmsk_sync ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_gmsk_sync.py)

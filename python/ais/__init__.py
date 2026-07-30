@@ -21,4 +21,5 @@ except ModuleNotFoundError:
 # import any pure python here
 from .gmsk_sync import square_and_fft_sync_cc
 from .ais_demod import ais_demod
+from .burst_demod import ais_burst_demod
 from .radio import ais_rx, ais_radio

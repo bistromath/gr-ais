@@ -28,7 +28,8 @@ list(APPEND ais_python_files
     invert_python.cc
     freqest_python.cc
     pdu_to_nmea_python.cc
-    viterbi_cpm_cb_python.cc python_bindings.cc)
+    viterbi_cpm_cb_python.cc
+    burst_sync_cc_python.cc python_bindings.cc)
 
 gr_pybind_make_oot(ais ../../.. gr::ais "${ais_python_files}")
 

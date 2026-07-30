@@ -33,6 +33,11 @@ namespace gr {
      * The input must be symbol-synchronized at samples_per_symbol samples
      * per symbol (e.g. from a Symbol Sync block with osps=2).
      *
+     * "burst_state" (long) and "burst_phase" (double) stream tags, as
+     * emitted by burst_sync_cc, realign the symbol grid to the tagged
+     * sample, restart the trellis in the tagged state, and set the phase
+     * tracker; without tags the decoder free-runs and self-acquires.
+     *
      * Output is one unpacked bit per symbol, delayed by traceback_len
      * symbols.
      */

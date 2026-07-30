@@ -35,6 +35,7 @@ namespace gr {
       long d_symbols_seen;
 
       char process_symbol(const gr_complex *in);
+      void seed(int state, float phase);
 
      public:
       viterbi_cpm_cb_impl(const std::vector<gr_complex> &branch_signals, const std::vector<int> &next_state, int samples_per_symbol, int traceback_len, float phase_gain);

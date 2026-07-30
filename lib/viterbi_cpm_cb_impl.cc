@@ -14,6 +14,9 @@
 namespace gr {
   namespace ais {
 
+    static const pmt::pmt_t PHASE_KEY = pmt::mp("burst_phase");
+    static const pmt::pmt_t STATE_KEY = pmt::mp("burst_state");
+
     viterbi_cpm_cb::sptr
     viterbi_cpm_cb::make(const std::vector<gr_complex> &branch_signals, const std::vector<int> &next_state, int samples_per_symbol, int traceback_len, float phase_gain)
     {
@@ -142,6 +145,17 @@ namespace gr {
     }
 
     void
+    viterbi_cpm_cb_impl::seed(int state, float phase)
+    {
+        std::fill(d_metrics.begin(), d_metrics.end(), -1e30f);
+        if (state >= 0 && state < d_num_states)
+            d_metrics[state] = 0.0f;
+        d_phase = phase;
+        d_symbols_seen = 0;
+        d_ring_pos = 0;
+    }
+
+    void
     viterbi_cpm_cb_impl::forecast (int noutput_items, gr_vector_int &ninput_items_required)
     {
         ninput_items_required[0] = noutput_items * d_sps;
@@ -156,15 +170,46 @@ namespace gr {
       auto in = static_cast<const gr_complex*>(input_items[0]);
       auto out = static_cast<char*>(output_items[0]);
 
-      const int nsym = std::min(noutput_items, ninput_items[0] / d_sps);
+      const uint64_t start = nitems_read(0);
+      const uint64_t end = start + ninput_items[0];
+
+      std::vector<tag_t> state_tags, phase_tags;
+      get_tags_in_range(state_tags, 0, start, end, STATE_KEY);
+      get_tags_in_range(phase_tags, 0, start, end, PHASE_KEY);
+
+      int consumed = 0;
       int produced = 0;
-      for (int k = 0; k < nsym; k++) {
-          const char bit = process_symbol(&in[k * d_sps]);
-          if (bit >= 0)
-              out[produced++] = bit;
+      size_t ti = 0;
+      while (true) {
+          const uint64_t pos = start + consumed;
+          if (ti < state_tags.size() && state_tags[ti].offset <= pos) {
+              float phase = 0.0f;
+              for (const auto &pt : phase_tags)
+                  if (pt.offset == state_tags[ti].offset)
+                      phase = pmt::to_double(pt.value);
+              seed(pmt::to_long(state_tags[ti].value), phase);
+              ti++;
+              continue;
+          }
+          // a tag mid-symbol redefines the symbol grid: discard the partial
+          // symbol and realign to the tagged sample
+          const uint64_t limit = ti < state_tags.size()
+                                 ? std::min(end, state_tags[ti].offset) : end;
+          if (pos + d_sps <= limit) {
+              if (produced >= noutput_items)
+                  break;
+              const char bit = process_symbol(&in[consumed]);
+              consumed += d_sps;
+              if (bit >= 0)
+                  out[produced++] = bit;
+          } else if (ti < state_tags.size() && limit == state_tags[ti].offset) {
+              consumed = limit - start;
+          } else {
+              break;
+          }
       }
 
-      consume_each(nsym * d_sps);
+      consume_each(consumed);
       return produced;
     }
 
