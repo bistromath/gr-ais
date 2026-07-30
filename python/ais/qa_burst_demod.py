@@ -11,8 +11,7 @@ import numpy as np
 import pmt
 from gnuradio import gr, gr_unittest, blocks, digital
 from gnuradio import ais
-from gnuradio.ais.qa_common import (SAMP_RATE, SPS, REFERENCE_PAYLOAD,
-                                    hdlc_frame, nrzi_encode, gmsk_modulate)
+from gnuradio.ais.qa_common import SAMP_RATE, SPS, REFERENCE_PAYLOAD, gmsk_modulate
 from gnuradio.ais.qa_burst_sync_cc import burst_levels
 
 #the data-aided burst receiver decodes isolated bursts on a quiet channel;

@@ -24,10 +24,8 @@
 # It uses the pubsub interface to allow clients to subscribe to its data feeds.
 
 from gnuradio import gr, filter, blocks, digital, network
-from gnuradio.filter import pfb
-from gnuradio.eng_option import eng_option
 from gnuradio.gr.pubsub import pubsub
-from optparse import OptionParser, OptionGroup
+from optparse import OptionGroup
 import re
 
 from .ais_demod import ais_demod
@@ -57,7 +55,6 @@ class ais_rx(gr.hier_block2):
                                                      self.coeffs,
                                                      freq,
                                                      rate)
-#        self.resamp = pfb.arb_resampler_ccf((self._bits_per_sec*self._samples_per_symbol)/int(rate/self._filter_decimation))
         options = {}
         options[ "samples_per_symbol" ] = (rate/self._filter_decimation)/self._bits_per_sec
         options[ "clockrec_gain" ] = 0.01
@@ -69,8 +66,6 @@ class ais_rx(gr.hier_block2):
         self.demod = ais_demod(options) #ais_demod takes in complex baseband and spits out 1-bit unpacked bitstream
         self.deframer = digital.hdlc_deframer_bp(11,64) #takes bytes, deframes, unstuffs, CRCs, and emits PDUs with frame contents
         self.nmea = pdu_to_nmea(designator) #turns data PDUs into NMEA sentences
-#        self.msgq = ais.pdu_to_msgq(queue) #posts PDUs to message queue for main program to parse at will
-#        self.parse = ais.parse(queue, designator) #ais_parse.cc, calculates CRC, parses data into NMEA AIVDM message, moves data onto queue
 
         self.connect(self,
                      self.filter,

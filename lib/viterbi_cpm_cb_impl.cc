@@ -29,7 +29,6 @@ namespace gr {
               gr::io_signature::make(1, 1, sizeof(gr_complex)),
               gr::io_signature::make(1, 1, sizeof(char))),
         d_branch_signals(branch_signals),
-        d_next_state(next_state),
         d_num_states(next_state.size() / 2),
         d_sps(samples_per_symbol),
         d_traceback_len(traceback_len),

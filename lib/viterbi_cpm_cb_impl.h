@@ -18,7 +18,6 @@ namespace gr {
     {
      private:
       std::vector<gr_complex> d_branch_signals;
-      std::vector<int> d_next_state;
       std::vector<std::array<int, 2>> d_prev_branch;
       int d_num_states;
       int d_sps;
