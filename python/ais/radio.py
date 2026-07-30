@@ -23,7 +23,7 @@
 # You pass it options, it gives you data.
 # It uses the pubsub interface to allow clients to subscribe to its data feeds.
 
-from gnuradio import gr, filter, blocks, digital
+from gnuradio import gr, filter, blocks, digital, network
 from gnuradio.filter import pfb
 from gnuradio.eng_option import eng_option
 from gnuradio.gr.pubsub import pubsub
@@ -32,6 +32,13 @@ import re
 
 from .ais_demod import ais_demod
 from .ais_python import pdu_to_nmea
+
+AIS_CENTER_FREQ = 162.0e6
+AIS_CHANNEL_A_FREQ = 161.975e6
+AIS_CHANNEL_B_FREQ = 162.025e6
+SOAPY_CHANNEL = 0
+UDP_HEADERTYPE_NONE = 0
+UDP_PAYLOAD_SIZE = 1472 #max payload of a standard 1500 byte Ethernet frame
 
 #hier block encapsulating all the signal processing after the source
 #could probably be split into its own file
@@ -71,6 +78,33 @@ class ais_rx(gr.hier_block2):
                      self.deframer)
         self.msg_connect(self.deframer, "out", self.nmea, "print")
 
+def _tune(src, freq, error_ppm):
+    if src.has_frequency_correction(SOAPY_CHANNEL):
+        src.set_frequency_correction(SOAPY_CHANNEL, error_ppm)
+        src.set_frequency(SOAPY_CHANNEL, freq)
+    else: #no hardware correction available, so pull the tuner off frequency instead
+        src.set_frequency(SOAPY_CHANNEL, freq * (1 + error_ppm/1.e6))
+    print("Tuned to %.3fMHz" % (src.get_frequency(SOAPY_CHANNEL) / 1.e6))
+
+def _center_freq(options):
+    return AIS_CHANNEL_A_FREQ if options.singlechannel else AIS_CENTER_FREQ
+
+def _set_gain(src, gain, agc):
+    if src.has_gain_mode(SOAPY_CHANNEL):
+        src.set_gain_mode(SOAPY_CHANNEL, agc)
+    elif agc:
+        raise Exception("Device does not support hardware AGC")
+
+    if agc:
+        print("Using hardware AGC")
+        return
+
+    if gain is None: #set to halfway
+        gain_range = src.get_gain_range(SOAPY_CHANNEL)
+        gain = (gain_range.minimum() + gain_range.maximum()) / 2.0
+    src.set_gain(SOAPY_CHANNEL, gain)
+    print("Gain is %.1fdB" % src.get_gain(SOAPY_CHANNEL))
+
 class ais_radio (gr.top_block, pubsub):
   def __init__(self, options):
     gr.top_block.__init__(self)
@@ -81,17 +115,16 @@ class ais_radio (gr.top_block, pubsub):
     self._rate = self.get_rate()
     print("Rate is %i" % (self._rate,))
 
-    if options.singlechannel is True:
-        self._rx_paths = (ais_rx(0, options.rate, "A"),)
-    else:
-        self._rx_paths = (ais_rx(161.975e6 - 162.0e6, options.rate, "A"),
-                          ais_rx(162.025e6 - 162.0e6, options.rate, "B"))
+    center_freq = _center_freq(options)
+    channel_freqs = (AIS_CHANNEL_A_FREQ,) if options.singlechannel \
+                    else (AIS_CHANNEL_A_FREQ, AIS_CHANNEL_B_FREQ)
+    self._rx_paths = tuple(ais_rx(freq - center_freq, options.rate, designator)
+                           for freq, designator in zip(channel_freqs, ("A", "B")))
     for rx_path in self._rx_paths:
         self.connect(self._u, rx_path)
 
     #now subscribe to set various options via pubsub
     self.subscribe("gain", self.set_gain)
-    self.subscribe("rate", self.set_rate)
 
     self.publish("gain", self.get_gain)
     self.publish("rate", self.get_rate)
@@ -101,20 +134,23 @@ class ais_radio (gr.top_block, pubsub):
     group = OptionGroup(parser, "Receiver setup options")
 
     #Choose source
-    group.add_option("-s","--source", type="string", default="uhd",
-                      help="Choose source: uhd, osmocom, <filename>, or <ip:port> [default=%default]")
+    group.add_option("-s","--source", type="string", default="soapy",
+                      help="Choose source: soapy, <filename>, or udp:<port> [default=%default]")
 
-    #UHD/Osmocom args
+    #SoapySDR args
+    group.add_option("-D", "--args", type="string", default="",
+                      help='SoapySDR device args, e.g. "driver=rtlsdr", "driver=airspy", '
+                           '"driver=uhd,type=b200" [default=first device found]')
     group.add_option("-R", "--subdev", type="string",
-                      help="select USRP Rx side A or B", metavar="SUBDEV")
+                      help="select frontend mapping, e.g. \"A:0\" on a USRP", metavar="SUBDEV")
     group.add_option("-A", "--antenna", type="string",
-                      help="select which antenna to use on daughterboard")
-    group.add_option("-D", "--args", type="string",
-                      help="arguments to pass to radio constructor", default="")
-    group.add_option("-g", "--gain", type="int", default=None,
-                      help="set RF gain", metavar="dB")
-    parser.add_option("-e", "--error", type="eng_float", default=0,
-                        help="set offset error of device in PPM [default=%default]")
+                      help="select which antenna to use")
+    group.add_option("-g", "--gain", type="eng_float", default=None,
+                      help="set RF gain [default=halfway]", metavar="dB")
+    group.add_option("--agc", action="store_true", default=False,
+                      help="use hardware AGC instead of a fixed gain [default=%default]")
+    group.add_option("-e", "--error", type="eng_float", default=0,
+                      help="set offset error of device in PPM [default=%default]")
     #RX path args
     group.add_option("-r", "--rate", type="eng_float", default=250e3,
                       help="set sample rate [default=%default]")
@@ -124,94 +160,50 @@ class ais_radio (gr.top_block, pubsub):
     parser.add_option_group(group)
 
   def live_source(self):
-    return self._options.source=="uhd" or self._options.source=="osmocom"
+    return self._options.source == "soapy"
 
   def set_gain(self, gain):
     if self.live_source():
-        self._u.set_gain(gain)
-        print("Gain is %f" % self.get_gain())
+        _set_gain(self._u, gain, False)
     return self.get_gain()
 
-  def set_rate(self, rate):
-    for rx_path in self._rx_paths:
-        rx_path1.set_rate(rate)
-    return self._u.set_rate(rate) if self.live_source() else self._rate
-
-  def set_threshold(self, threshold):
-    for rx_path in self._rx_paths:
-        rx_path.set_threshold(threshold)
-
   def get_gain(self):
-    return self._u.get_gain() if self.live_source() else 0
+    return self._u.get_gain(SOAPY_CHANNEL) if self.live_source() else 0
 
   def get_rate(self):
-    return self._u.get_samp_rate() if self.live_source() else self._rate
+    return self._u.get_sample_rate(SOAPY_CHANNEL) if self.live_source() else self._rate
 
   def _setup_source(self, options):
-    if options.source == "uhd":
-      #UHD source by default
-      from gnuradio import uhd
-      src = uhd.usrp_source(options.args, uhd.stream_args(cpu_format="fc32", channels=range(1)))
+    if options.source == "soapy":
+      return self._setup_soapy_source(options)
 
-      if(options.subdev):
-        src.set_subdev_spec(options.subdev, 0)
+    self._rate = options.rate
+    return self._setup_offline_source(options)
 
-      if not src.set_center_freq(162.0e6 * (1 + options.error/1.e6)):
-        print("Failed to set initial frequency")
-      else:
-        print("Tuned to %.3fMHz" % (src.get_center_freq() / 1.e6))
+  @staticmethod
+  def _setup_soapy_source(options):
+    from gnuradio import soapy #gr-soapy ships separately, so only demand it for live sources
+    src = soapy.source(options.args, "fc32", 1, "", "", [""], [""])
+    print("Using SoapySDR device %s" % (options.args if options.args else "(first found)",))
 
-      #check for GPSDO
-      #if you have a GPSDO, UHD will automatically set the timestamp to UTC time
-      #as well as automatically set the clock to lock to GPSDO.
-      if src.get_time_source(0) != 'gpsdo':
-        src.set_time_now(uhd.time_spec(0.0))
+    if options.subdev is not None:
+      src.set_frontend_mapping(options.subdev)
+    if options.antenna is not None:
+      src.set_antenna(SOAPY_CHANNEL, options.antenna)
 
-      if options.antenna is not None:
-        src.set_antenna(options.antenna)
-
-      src.set_samp_rate(options.rate)
-
-      if options.gain is None: #set to halfway
-        g = src.get_gain_range()
-        options.gain = (g.start()+g.stop()) / 2.0
-
-      print("Setting gain to %i" % options.gain)
-      src.set_gain(options.gain)
-      print("Gain is %i" % src.get_gain())
-
-    #TODO: detect if you're using an RTLSDR or Jawbreaker
-    #and set up accordingly.
-    elif options.source == "osmocom": #RTLSDR dongle or HackRF Jawbreaker
-        import osmosdr
-        src = osmosdr.source(options.args)
-        src.set_sample_rate(options.rate)
-        src.get_samp_rate = src.get_sample_rate #alias for UHD compatibility
-        if not src.set_center_freq(162.0e6 * (1 + options.error/1.e6)):
-            print("Failed to set initial frequency")
-        else:
-            print("Tuned to %.3fMHz" % (src.get_center_freq() / 1.e6))
-
-        if options.gain is None:
-            options.gain = 34
-        src.set_gain(options.gain)
-        print("Gain is %i" % src.get_gain())
-
-    else:
-      #semantically detect whether it's ip.ip.ip.ip:port or filename
-      self._rate = options.rate
-      if ':' in options.source:
-        try:
-          ip, port = re.search(r"(.*)\:(\d{1,5})", options.source).groups()
-        except:
-          raise Exception("Please input UDP source e.g. 192.168.10.1:12345")
-        src = blocks.udp_source(gr.sizeof_gr_complex, ip, int(port))
-        print("Using UDP source %s:%s" % (ip, port))
-      else:
-        src = blocks.file_source(gr.sizeof_gr_complex, options.source)
-        print("Using file source %s" % options.source)
-
+    src.set_sample_rate(SOAPY_CHANNEL, options.rate)
+    _tune(src, _center_freq(options), options.error)
+    _set_gain(src, options.gain, options.agc)
     return src
 
-  def close(self):
-    src = None
+  @staticmethod
+  def _setup_offline_source(options):
+    udp = re.match(r"udp:(\d{1,5})$", options.source)
+    if udp is not None:
+      port = int(udp.group(1))
+      print("Listening for complex samples on UDP port %i" % (port,))
+      return network.udp_source(gr.sizeof_gr_complex, 1, port, UDP_HEADERTYPE_NONE,
+                                UDP_PAYLOAD_SIZE, False, False, False)
+
+    print("Using file source %s" % options.source)
+    return blocks.file_source(gr.sizeof_gr_complex, options.source)
