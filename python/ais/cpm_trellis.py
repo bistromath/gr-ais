@@ -21,13 +21,19 @@ PREAMBLE_SYMBOLS = 24
 FLAG_BITS = [0, 1, 1, 1, 1, 1, 1, 0]
 REFERENCE_START_SYMBOL = 16
 REFERENCE_SYMBOLS = 24
+SLOT_SYMBOLS = 256
+DEFAULT_TRACEBACK_LEN = 48
+DEFAULT_PHASE_GAIN = 0.1
 
 
 def gmsk_trellis(samples_per_symbol, bt=0.4):
     '''Returns (branch_signals, next_state, num_states) for viterbi_cpm_cb.
 
     Branch index b corresponds to source state b//2 and input bit b&1;
-    branch_signals is flattened [num_branches][samples_per_symbol].'''
+    branch_signals is flattened [num_branches][samples_per_symbol].
+    State = phase_index * 2**(memory-1) + history: phase_index selects a
+    multiple of pi/2, and history holds the last memory-1 input bits,
+    oldest first (most significant bit).'''
     sps = samples_per_symbol
     gauss = grfilter.firdes.gaussian(1, sps, bt, 4 * sps)
     taps = np.convolve(gauss, np.ones(sps))
@@ -70,9 +76,9 @@ def _nrzi(bits):
 
 def _chain(signals, next_state, num_states, sps, levels, start, nsym):
     table = np.array(signals).reshape(num_states * 2, sps)
-    memory = int(np.log2(len(next_state) // 8)) + 1
+    history_bits = (num_states // 4).bit_length() - 1
     state = 0
-    for lvl in levels[start - (memory - 1):start]:
+    for lvl in levels[start - history_bits:start]:
         state = state * 2 + lvl
     out = []
     for lvl in levels[start:start + nsym]:

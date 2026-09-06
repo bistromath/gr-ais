@@ -33,7 +33,9 @@ namespace gr {
       int d_ring_pos;
       long d_symbols_seen;
 
-      char process_symbol(const gr_complex *in);
+      int process_symbol(const gr_complex *in);
+      void update_phase(int branch);
+      int traceback(int state) const;
       void seed(int state, float phase);
 
      public:

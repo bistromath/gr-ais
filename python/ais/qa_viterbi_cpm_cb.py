@@ -6,25 +6,14 @@
 #
 
 import numpy as np
-from gnuradio import gr, gr_unittest, blocks, digital
+from gnuradio import gr, gr_unittest, blocks
 from gnuradio import ais
 from gnuradio.ais.cpm_trellis import gmsk_trellis
+from gnuradio.ais.qa_common import gmsk_modulate
 
 Q = 2
 TRACEBACK = 32
 MERGE_SLACK = 16
-
-
-def modulated(bits):
-    padded = bits + [0] * ((8 - len(bits) % 8) % 8)
-    packed = np.packbits(np.array(padded, dtype=np.uint8))
-    tb = gr.top_block()
-    src = blocks.vector_source_b(packed.tolist())
-    mod = digital.gmsk_mod(Q, 0.4)
-    sink = blocks.vector_sink_c()
-    tb.connect(src, mod, sink)
-    tb.run()
-    return np.array(sink.data())
 
 
 class qa_viterbi_cpm_cb(gr_unittest.TestCase):
@@ -51,7 +40,7 @@ class qa_viterbi_cpm_cb(gr_unittest.TestCase):
         rng = np.random.default_rng(11)
         bits = rng.integers(0, 2, 400).tolist()
 
-        decoded = self._decode(modulated(bits))
+        decoded = self._decode(gmsk_modulate(bits, Q))
 
         n = len(decoded)
         self.assertGreater(n, 300)
@@ -60,7 +49,7 @@ class qa_viterbi_cpm_cb(gr_unittest.TestCase):
     def test_absorbs_constant_carrier_phase(self):
         rng = np.random.default_rng(13)
         bits = rng.integers(0, 2, 400).tolist()
-        rotated = modulated(bits) * np.exp(1j * np.radians(145))
+        rotated = gmsk_modulate(bits, Q) * np.exp(1j * np.radians(145))
 
         decoded = self._decode(rotated)
 
@@ -71,6 +60,15 @@ class qa_viterbi_cpm_cb(gr_unittest.TestCase):
         with self.assertRaises(ValueError):
             ais.viterbi_cpm_cb(self.signals[:-1], self.next_state, Q,
                                TRACEBACK, 0.1)
+
+    def test_warmup_emits_no_sentinel_bytes(self):
+        rng = np.random.default_rng(17)
+        bits = rng.integers(0, 2, 80).tolist()
+        decoded = self._decode(gmsk_modulate(bits, Q))
+
+        self.assertEqual(len(decoded), len(bits) - TRACEBACK + 1)
+        self.assertTrue(all(bit in (0, 1) for bit in decoded))
+        self.assertEqual(decoded[MERGE_SLACK:], bits[MERGE_SLACK:len(decoded)])
 
 
 if __name__ == '__main__':

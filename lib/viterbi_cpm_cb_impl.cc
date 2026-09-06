@@ -76,7 +76,7 @@ namespace gr {
     {
     }
 
-    char
+    int
     viterbi_cpm_cb_impl::process_symbol(const gr_complex *in)
     {
         const int num_branches = 2 * d_num_states;
@@ -118,14 +118,7 @@ namespace gr {
         for (int s = 0; s < d_num_states; s++)
             d_metrics[s] = d_new_metrics[s] - best_metric;
 
-        if (d_phase_gain != 0.0f) {
-            const gr_complex *sig = &d_branch_signals[surv[best_state] * d_sps];
-            gr_complex corr(0, 0);
-            for (int i = 0; i < d_sps; i++)
-                corr += std::conj(sig[i]) * rk[i];
-            d_phase += d_phase_gain * std::arg(corr);
-            d_phase = std::fmod(d_phase, 2.0f * float(M_PI));
-        }
+        update_phase(surv[best_state]);
 
         d_symbols_seen++;
         d_ring_pos = (d_ring_pos + 1) % d_traceback_len;
@@ -133,12 +126,31 @@ namespace gr {
         if (d_symbols_seen < d_traceback_len)
             return -1;
 
-        int s = best_state;
+        return traceback(best_state);
+    }
+
+    void
+    viterbi_cpm_cb_impl::update_phase(int branch)
+    {
+        if (d_phase_gain == 0.0f)
+            return;
+
+        const gr_complex *sig = &d_branch_signals[branch * d_sps];
+        gr_complex corr(0, 0);
+        for (int i = 0; i < d_sps; i++)
+            corr += std::conj(sig[i]) * d_rotated[i];
+        d_phase += d_phase_gain * std::arg(corr);
+        d_phase = std::fmod(d_phase, 2.0f * float(M_PI));
+    }
+
+    int
+    viterbi_cpm_cb_impl::traceback(int state) const
+    {
         int b = 0;
         for (int i = 1; i <= d_traceback_len; i++) {
             const int pos = (d_ring_pos - i + d_traceback_len) % d_traceback_len;
-            b = d_survivors[pos * d_num_states + s];
-            s = b / 2;
+            b = d_survivors[pos * d_num_states + state];
+            state = b / 2;
         }
         return b & 1;
     }
@@ -197,10 +209,10 @@ namespace gr {
           if (pos + d_sps <= limit) {
               if (produced >= noutput_items)
                   break;
-              const char bit = process_symbol(&in[consumed]);
+              const int bit = process_symbol(&in[consumed]);
               consumed += d_sps;
               if (bit >= 0)
-                  out[produced++] = bit;
+                  out[produced++] = static_cast<char>(bit);
           } else if (ti < state_tags.size() && limit == state_tags[ti].offset) {
               consumed = limit - start;
           } else {

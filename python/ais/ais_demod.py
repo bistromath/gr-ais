@@ -16,7 +16,7 @@ from gnuradio import analog
 import math
 
 from .ais_python import invert, viterbi_cpm_cb
-from .cpm_trellis import gmsk_trellis
+from .cpm_trellis import gmsk_trellis, DEFAULT_TRACEBACK_LEN, DEFAULT_PHASE_GAIN
 from .gmsk_sync import square_and_fft_sync_cc
 class ais_demod(gr.hier_block2):
     def __init__(self, options):
@@ -60,12 +60,12 @@ class ais_demod(gr.hier_block2):
         self.invert = invert() #NRZI signal diff decoded and inverted should give original signal
 
         if self._coherent:
-            signals, next_state, num_states = gmsk_trellis(clockrec_osps)
+            signals, next_state, _ = gmsk_trellis(clockrec_osps)
             self.trellis_demod = viterbi_cpm_cb(signals,
                                                 next_state,
                                                 clockrec_osps,
-                                                48, #traceback length, symbols
-                                                0.1) #phase tracking gain
+                                                DEFAULT_TRACEBACK_LEN,
+                                                DEFAULT_PHASE_GAIN)
             self.connect(self, self.freq_sync, self.agc, (self.preamble_detect, 0),
                          self.clockrec, self.trellis_demod, self.diff, self.invert, self)
         else:

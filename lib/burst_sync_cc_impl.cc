@@ -90,7 +90,7 @@ namespace gr {
                 continue;
             }
             const int rel = lag - buf_start;
-            const float energy = d_energy[rel + d_ref_len] - d_energy[rel];
+            const double energy = d_energy[rel + d_ref_len] - d_energy[rel];
             if (energy <= 0.0f)
                 continue;
             for (size_t r = 0; r < d_refs.size(); r++) {
@@ -152,7 +152,8 @@ namespace gr {
       const int navail = noutput_items + d_delay;
 
       d_energy.resize(navail + 1);
-      d_energy[0] = 0.0f;
+      // Preserve weak windows when subtracting prefix sums after a strong burst.
+      d_energy[0] = 0.0;
       for (int i = 0; i < navail; i++)
           d_energy[i + 1] = d_energy[i] + std::norm(in[i]);
 

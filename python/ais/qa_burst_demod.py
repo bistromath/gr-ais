@@ -11,8 +11,8 @@ import numpy as np
 import pmt
 from gnuradio import gr, gr_unittest, blocks, digital
 from gnuradio import ais
-from gnuradio.ais.qa_common import SAMP_RATE, SPS, REFERENCE_PAYLOAD, gmsk_modulate
-from gnuradio.ais.qa_burst_sync_cc import burst_levels
+from gnuradio.ais.qa_common import (SAMP_RATE, SPS, REFERENCE_PAYLOAD,
+                                    gmsk_modulate, burst_levels, burst_pair)
 
 #the data-aided burst receiver decodes isolated bursts on a quiet channel;
 #measured threshold is ~8 dB Eb/N0, 10 dB keeps this test deterministic
@@ -41,8 +41,11 @@ class qa_burst_demod(gr_unittest.TestCase):
             1j * (rng.uniform(0, 2 * np.pi)
                   + 2 * np.pi * FREQ_OFFSET_HZ * (n + GUARD) / SAMP_RATE))
 
-        src = blocks.vector_source_c(rx.tolist())
-        demod = ais.ais_burst_demod(SPS)
+        return self._decode_samples(rx)[0]
+
+    def _decode_samples(self, samples, expected_count=1, burst_slots=1):
+        src = blocks.vector_source_c(samples.tolist())
+        demod = ais.ais_burst_demod(SPS, burst_slots=burst_slots)
         deframer = digital.hdlc_deframer_bp(11, 64)
         debug = blocks.message_debug()
         self.tb.connect(src, demod, deframer)
@@ -50,11 +53,12 @@ class qa_burst_demod(gr_unittest.TestCase):
 
         self.tb.run()
         deadline = time.monotonic() + 5.0
-        while debug.num_messages() < 1 and time.monotonic() < deadline:
+        while debug.num_messages() < expected_count and time.monotonic() < deadline:
             time.sleep(0.01)
 
-        self.assertGreaterEqual(debug.num_messages(), 1)
-        return bytes(pmt.u8vector_elements(pmt.cdr(debug.get_message(0))))
+        self.assertEqual(debug.num_messages(), expected_count)
+        return [bytes(pmt.u8vector_elements(pmt.cdr(debug.get_message(i))))
+                for i in range(debug.num_messages())]
 
     def test_decodes_isolated_burst_variant_a(self):
         decoded = self._decode(False, seed=42)
@@ -65,6 +69,21 @@ class qa_burst_demod(gr_unittest.TestCase):
         decoded = self._decode(True, seed=43)
 
         self.assertEqual(decoded, REFERENCE_PAYLOAD)
+
+    def test_decodes_adjacent_slots(self):
+        decoded = self._decode_samples(burst_pair(256), expected_count=2)
+        self.assertEqual(decoded, [REFERENCE_PAYLOAD, REFERENCE_PAYLOAD])
+
+    def test_decodes_known_two_slot_bursts(self):
+        payload = bytes(np.random.default_rng(23).integers(0, 256, 42, dtype=np.uint8))
+        decoded = self._decode_samples(burst_pair(512, payload=payload),
+                                       expected_count=2, burst_slots=2)
+        self.assertEqual(decoded, [payload, payload])
+
+    def test_rejects_invalid_slot_spacing(self):
+        for slots in (0, -1, 1.5):
+            with self.subTest(slots=slots), self.assertRaises(ValueError):
+                ais.ais_burst_demod(SPS, burst_slots=slots)
 
 
 if __name__ == '__main__':

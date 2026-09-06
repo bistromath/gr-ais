@@ -11,18 +11,12 @@ from gnuradio import gr, gr_unittest, blocks
 from gnuradio import ais
 from gnuradio.ais.cpm_trellis import (gmsk_burst_reference, RAMP_SYMBOLS,
                                       PREAMBLE_SYMBOLS)
-from gnuradio.ais.qa_common import (SAMP_RATE, SPS, REFERENCE_PAYLOAD,
-                                    hdlc_frame, nrzi_encode, gmsk_modulate)
+from gnuradio.ais.qa_common import (SAMP_RATE, SPS, burst_levels, gmsk_modulate,
+                                    burst_pair, BURST_GUARD_SAMPLES)
 
 GUARD = 1000
 FREQ_OFFSET_HZ = 437.0
 TAG_SYMBOL = RAMP_SYMBOLS + PREAMBLE_SYMBOLS - 1
-
-
-def burst_levels(variant_b):
-    bits = [0, 1] * ((RAMP_SYMBOLS + PREAMBLE_SYMBOLS) // 2) + hdlc_frame(REFERENCE_PAYLOAD)
-    levels = nrzi_encode(bits)
-    return [1 - lvl for lvl in levels] if variant_b else levels
 
 
 class qa_burst_sync_cc(gr_unittest.TestCase):
@@ -71,6 +65,30 @@ class qa_burst_sync_cc(gr_unittest.TestCase):
 
     def test_detects_variant_b_and_derotates(self):
         self._check(True, self.seed_b)
+
+    def test_weak_burst_detection_is_independent_of_work_size(self):
+        samples = burst_pair(512, second_amplitude=0.003)
+        expected_offsets = [BURST_GUARD_SAMPLES + TAG_SYMBOL * SPS
+                            + 2 * len(self.reference) + i * 512 * SPS
+                            for i in range(2)]
+        for chunk in (64, 8192):
+            with self.subTest(chunk=chunk):
+                tb = gr.top_block()
+                src = blocks.vector_source_c(samples.tolist())
+                dut = ais.burst_sync_cc(self.reference, SAMP_RATE,
+                                        list(range(-1200, 1201, 200)), 0.4,
+                                        self.tag_offset, self.seed_a, self.seed_b,
+                                        300 * SPS)
+                dut.set_max_noutput_items(chunk)
+                sink = blocks.vector_sink_c()
+                tb.connect(src, dut, sink)
+                tb.run()
+
+                tags = [t for t in sink.tags()
+                        if pmt.symbol_to_string(t.key) == "burst_state"]
+                self.assertEqual([int(t.offset) for t in tags], expected_offsets)
+                self.assertEqual([pmt.to_long(t.value) for t in tags],
+                                 [self.seed_a, self.seed_b])
 
 
 if __name__ == '__main__':

@@ -14,6 +14,7 @@ SAMP_RATE = 48000.0
 BIT_RATE = 9600.0
 SPS = int(SAMP_RATE / BIT_RATE)
 GMSK_BT = 0.4
+BURST_GUARD_SAMPLES = 1000
 
 # 21-byte payload of the published reference position report
 # !AIVDM,1,1,,B,177KQJ5000G?tO`K>RA1wUbN0TKH,0*5C
@@ -64,15 +65,37 @@ def hdlc_frame(payload):
     return flag + body + flag
 
 
-def gmsk_modulate(bits):
+def burst_levels(variant_b=False, payload=REFERENCE_PAYLOAD):
+    # Eight ramp symbols, 24 training symbols, then the HDLC frame.
+    levels = nrzi_encode([0, 1] * 16 + hdlc_frame(payload))
+    return [1 - lvl for lvl in levels] if variant_b else levels
+
+
+def gmsk_modulate(bits, samples_per_symbol=SPS):
     padded = bits + [0] * ((8 - len(bits) % 8) % 8)
     packed = np.packbits(np.array(padded, dtype=np.uint8))
 
     tb = gr.top_block()
     src = blocks.vector_source_b(packed.tolist())
-    mod = digital.gmsk_mod(SPS, GMSK_BT)
+    mod = digital.gmsk_mod(samples_per_symbol, GMSK_BT)
     sink = blocks.vector_sink_c()
     tb.connect(src, mod, sink)
     tb.run()
 
     return np.array(sink.data())
+
+
+def burst_pair(spacing_symbols, second_amplitude=1.0, payload=REFERENCE_PAYLOAD):
+    '''Two noiseless transmitters with different carrier offsets and NRZI levels.'''
+    bursts = [gmsk_modulate(burst_levels(variant, payload)) for variant in (False, True)]
+    spacing = spacing_symbols * SPS
+    if len(bursts[0]) > spacing:
+        raise ValueError("burst_pair requires non-overlapping bursts")
+    rx = np.zeros(BURST_GUARD_SAMPLES + spacing + len(bursts[1]) + 1500,
+                  dtype=np.complex64)
+    for i, (burst, freq, amplitude) in enumerate(zip(
+            bursts, (437.0, -650.0), (1.0, second_amplitude))):
+        start = BURST_GUARD_SAMPLES + i * spacing
+        phase = 0.7 + 2 * np.pi * freq * np.arange(len(burst)) / SAMP_RATE
+        rx[start:start + len(burst)] = amplitude * burst * np.exp(1j * phase)
+    return rx

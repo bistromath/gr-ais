@@ -53,7 +53,7 @@ namespace gr {
       std::deque<pending_tag> d_tags;
       float d_freq;         // active rotation, rad/sample
       float d_phase;        // rotation phase at the next output item
-      std::vector<float> d_energy;
+      std::vector<double> d_energy;
 
       void evaluate_lags(const gr_complex *buf, int64_t buf_start, int64_t lag_end);
       void confirm(const gr_complex *buf, int64_t buf_start);
