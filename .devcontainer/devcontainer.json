@@ -1,0 +1,28 @@
+{
+  "name": "gr-ais (Ubuntu 24.04)",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "remoteUser": "vscode",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools",
+        "ms-python.python"
+      ],
+      "settings": {
+        "cmake.generator": "Ninja",
+        "cmake.buildDirectory": "${workspaceFolder}/build/devcontainer",
+        "cmake.configureSettings": {
+          "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+          "CMAKE_INSTALL_PREFIX": "/usr/local",
+          "PYTHON_EXECUTABLE": "/usr/bin/python3"
+        },
+        "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+        "python.defaultInterpreterPath": "/usr/bin/python3"
+      }
+    }
+  },
+  "postCreateCommand": "cmake -S . -B build/devcontainer -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=/usr/local -DPYTHON_EXECUTABLE=/usr/bin/python3"
+}
